@@ -3,7 +3,10 @@ package main
 import (
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 
+	"premium_caste/internal/app"
 	"premium_caste/internal/config"
 )
 
@@ -18,7 +21,7 @@ func main() {
 
 	log := setupLogger(cfg.Env)
 
-	// application := app.New(log, cfg.GRPC.Port, cfg.DSN, cfg.HTTP.Host, cfg.HTTP.Port, cfg.Token, cfg.TokenTTL, cfg.WatcherCreate, cfg.WatcherRecovery, cfg.FilesPath)
+	application := app.New(log, cfg.DSN, cfg.HTTP.Host, cfg.HTTP.Port)
 
 	// go func() {
 	// 	application.GRPCServer.MustRun()
@@ -33,11 +36,11 @@ func main() {
 	// 	application.FileService.FileRun()
 	// }()
 
-	// // Graceful shutdown
-	// stop := make(chan os.Signal, 1)
-	// signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+	// Graceful shutdown
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 
-	// <-stop
+	<-stop
 	// application.GRPCServer.Stop()
 	// application.HTTPServer.Stop()
 	// application.FileService.Stop()

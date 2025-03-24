@@ -15,9 +15,9 @@ run_file_service:
 run-race:
 	go run ./file_service/cmd/file_service/main.go --config=./file_service/config/local.yaml
 
-file_service_migration-up:
-	goose --dir=./file_service/migrations postgres ${DATABASE_URL_FILE_SERVICE} up
+migration-up:
+	goose --dir=./migrations postgres ${DATABASE_URL} up
 
-file_service_migration-down:
-	goose --dir=./file_service/migrations postgres ${DATABASE_URL_FILE_SERVICE} down
+migration-down:
+	goose --dir=./migrations postgres ${DATABASE_URL} down
 
