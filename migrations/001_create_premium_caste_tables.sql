@@ -10,7 +10,7 @@ CREATE TABLE "public"."users" (
     "name" varchar NOT NULL,
     "email" varchar NOT NULL,
     "phone" varchar(255) NOT NULL,
-    "password" varchar(255) NOT NULL,
+    "password" bytea(255) NOT NULL,
     "permission_id" int2 NOT NULL,
     "basket_id" int2,
     "registration_date" date,
