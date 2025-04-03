@@ -5,15 +5,17 @@ go 1.23.0
 require (
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/arl/statsviz v0.6.0
+	github.com/brianvoe/gofakeit v3.18.0+incompatible
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/jackc/pgx/v4 v4.18.3
-	github.com/labstack/echo v3.3.10+incompatible
 	github.com/labstack/echo/v4 v4.13.3
+	github.com/stretchr/testify v1.10.0
 )
 
 require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.14.3 // indirect
@@ -29,6 +31,7 @@ require (
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	golang.org/x/crypto v0.31.0 // indirect

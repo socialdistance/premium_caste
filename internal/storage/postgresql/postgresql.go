@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"premium_caste/internal/domain/models"
 	"premium_caste/internal/storage"
+	"time"
 
 	sq "github.com/Masterminds/squirrel"
 
@@ -41,13 +42,57 @@ func (s *Storage) Stop() {
 }
 
 // SaveUser saves user to db
-func (s *Storage) SaveUser(ctx context.Context) (int64, error) {
+func (s *Storage) SaveUser(ctx context.Context, name, email, phone string, password []byte, permissionId, basketId int) (int64, error) {
 	const op = "storage.postgresql.SaveUser"
 
-	builder := sq.Insert(userTabe).Columns()
+	// query, args, err := sq.Insert(userTabe).Columns(
+	// 	"name",
+	// 	"email",
+	// 	"phone",
+	// 	"password",
+	// 	"permission_id",
+	// 	"basket_id",
+	// 	"registration_date",
+	// 	"last_login",
+	// ).Values(name, email, phone, password, permissiongitId, basketId, time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339)).Suffix("RETURNING id").PlaceholderFormat(sq.Dollar).ToSql()
+
+	builder := sq.Insert(userTabe).Columns(
+		"name",
+		"email",
+		"phone",
+		"password",
+		"permission_id",
+		"basket_id",
+		"registration_date",
+		"last_login",
+	)
+
+	builder = builder.Values(name, email, phone, password, permissionId, basketId, time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339))
+
+	query, args, err := builder.Suffix("RETURNING id").PlaceholderFormat(sq.Dollar).ToSql()
+	if err != nil {
+		return 0, fmt.Errorf("%s: can't build sql:%w", op, err)
+	}
+
+	rows, err := s.db.Query(s.ctx, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("%s: row err: %w", op, err)
+	}
+	defer rows.Close()
+
+	var ID int64
+	for rows.Next() {
+		scanErr := rows.Scan(&ID)
+		if scanErr != nil {
+			return 0, fmt.Errorf("%s can't scan id: %s", op, scanErr.Error())
+		}
+	}
+
+	return ID, nil
 }
 
 // User returns user by email
+// Rewrite to sq
 func (s *Storage) User(ctx context.Context, email string) (models.User, error) {
 	const op = "storage.postgresql.User"
 
@@ -69,3 +114,5 @@ func (s *Storage) User(ctx context.Context, email string) (models.User, error) {
 
 	return user, nil
 }
+
+// Basket returns table basket by user id

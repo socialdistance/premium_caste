@@ -10,7 +10,7 @@ import (
 	httprouters "premium_caste/internal/http"
 
 	"github.com/arl/statsviz"
-	"github.com/labstack/echo"
+	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
 
