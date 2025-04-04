@@ -45,17 +45,6 @@ func (s *Storage) Stop() {
 func (s *Storage) SaveUser(ctx context.Context, name, email, phone string, password []byte, permissionId, basketId int) (int64, error) {
 	const op = "storage.postgresql.SaveUser"
 
-	// query, args, err := sq.Insert(userTabe).Columns(
-	// 	"name",
-	// 	"email",
-	// 	"phone",
-	// 	"password",
-	// 	"permission_id",
-	// 	"basket_id",
-	// 	"registration_date",
-	// 	"last_login",
-	// ).Values(name, email, phone, password, permissiongitId, basketId, time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339)).Suffix("RETURNING id").PlaceholderFormat(sq.Dollar).ToSql()
-
 	builder := sq.Insert(userTabe).Columns(
 		"name",
 		"email",
@@ -107,9 +96,11 @@ func (s *Storage) User(ctx context.Context, email string) (models.User, error) {
 
 	var user models.User
 
-	err = rows.Scan(&user.ID, &user.Name, &user.Email, &user.Password, &user.Permission_id, &user.Basket_id)
-	if err != nil {
-		return models.User{}, fmt.Errorf("%s: %w", op, storage.ErrUserNotFound)
+	for rows.Next() {
+		err = rows.Scan(&user.ID, &user.Name, &user.Email, &user.Password, &user.Permission_id, &user.Basket_id)
+		if err != nil {
+			return models.User{}, fmt.Errorf("%s: %w", op, storage.ErrUserNotFound)
+		}
 	}
 
 	return user, nil

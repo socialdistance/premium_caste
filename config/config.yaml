@@ -1,5 +1,6 @@
 env: "local" # dev, prod
 dsn: "postgres://postgres:postgres@localhost:54321/premium_caste"
+token_ttl: 1h
 http:
   host: "127.0.0.1"
   port: "8080"

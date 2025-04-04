@@ -34,7 +34,7 @@ func TestStorage(t *testing.T) {
 			t.Fatal("Failed to connect to DB server", err)
 		}
 
-		id, err := storage.SaveUser(ctx, "test", email, "8-888-888-88-88", []byte(pass), 1, 1)
+		id, err := storage.SaveUser(ctx, gofakeit.FirstName(), email, gofakeit.Contact().Phone, []byte(pass), 1, 1)
 		require.NoError(t, err)
 		require.NotEmpty(t, id)
 
@@ -42,6 +42,10 @@ func TestStorage(t *testing.T) {
 		if err != nil {
 			t.Fatal("Failed to rollback tx", err)
 		}
+
+		user, err := storage.User(ctx, email)
+		require.NoError(t, err)
+		require.NotEmpty(t, user)
 	})
 }
 

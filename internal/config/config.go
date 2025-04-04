@@ -3,14 +3,16 @@ package config
 import (
 	"flag"
 	"os"
+	"time"
 
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
 type Config struct {
-	Env  string     `yaml:"env" env-default:"local"`
-	DSN  string     `yaml:"dsn" env-required:"true"`
-	HTTP HTTPConfig `yaml:"http"`
+	Env      string        `yaml:"env" env-default:"local"`
+	DSN      string        `yaml:"dsn" env-required:"true"`
+	TokenTTL time.Duration `yaml:"token_ttl" env-default:"1h"`
+	HTTP     HTTPConfig    `yaml:"http"`
 }
 
 type HTTPConfig struct {

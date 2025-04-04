@@ -13,8 +13,8 @@ CREATE TABLE "public"."users" (
     "password" bytea(255) NOT NULL,
     "permission_id" int2 NOT NULL,
     "basket_id" int2,
-    "registration_date" date,
-    "last_login" date,
+    "registration_date" timestamp,
+    "last_login" timestamp,
     PRIMARY KEY ("id")
 );
 
