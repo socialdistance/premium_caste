@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/brianvoe/gofakeit"
+	"github.com/google/uuid"
 	pgx4 "github.com/jackc/pgx/v4"
 	"github.com/stretchr/testify/require"
 
@@ -23,6 +24,7 @@ func TestStorage(t *testing.T) {
 
 	email := gofakeit.Email()
 	pass := randomFakePassword()
+	basket_id := uuid.New()
 
 	t.Run("test SQL", func(t *testing.T) {
 		tx, err := storage.db.BeginTx(ctx, pgx4.TxOptions{
@@ -34,7 +36,7 @@ func TestStorage(t *testing.T) {
 			t.Fatal("Failed to connect to DB server", err)
 		}
 
-		id, err := storage.SaveUser(ctx, gofakeit.FirstName(), email, gofakeit.Contact().Phone, []byte(pass), 1, 1)
+		id, err := storage.SaveUser(ctx, gofakeit.FirstName(), email, gofakeit.Contact().Phone, []byte(pass), 1, basket_id)
 		require.NoError(t, err)
 		require.NotEmpty(t, id)
 

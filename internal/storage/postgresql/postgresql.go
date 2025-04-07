@@ -8,6 +8,7 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/google/uuid"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 )
@@ -42,7 +43,7 @@ func (s *Storage) Stop() {
 }
 
 // SaveUser saves user to db
-func (s *Storage) SaveUser(ctx context.Context, name, email, phone string, password []byte, permissionId, basketId int) (int64, error) {
+func (s *Storage) SaveUser(ctx context.Context, name, email, phone string, password []byte, permissionId int, basketId uuid.UUID) (int64, error) {
 	const op = "storage.postgresql.SaveUser"
 
 	builder := sq.Insert(userTabe).Columns(

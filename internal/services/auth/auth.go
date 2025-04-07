@@ -11,6 +11,7 @@ import (
 	"premium_caste/internal/lib/jwt"
 	"premium_caste/internal/storage"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -28,7 +29,7 @@ type Auth struct {
 }
 
 type UserSaver interface {
-	SaveUser(ctx context.Context, name, email, phone string, password []byte, permissionId, basketId int) (int64, error)
+	SaveUser(ctx context.Context, name, email, phone string, password []byte, permissionId int, basketId uuid.UUID) (int64, error)
 }
 
 type UserProvider interface {
@@ -84,7 +85,6 @@ func (a *Auth) Login(ctx context.Context, email, password string, appID int) (st
 	return token, nil
 }
 
-// SaveUser(ctx context.Context, name, email, phone string, password []byte, permissionId, basketId int) (int64, error)
 func (a *Auth) RegisterNewUser(ctx context.Context, name, email, phone, pass string) (int64, error) {
 	const op = "auth.RegisterNewUser"
 
@@ -102,7 +102,9 @@ func (a *Auth) RegisterNewUser(ctx context.Context, name, email, phone, pass str
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
 
-	id, err := a.usrSaver.SaveUser(ctx, name, email, phone, passHash, )
+	basket_id := uuid.New()
+
+	id, err := a.usrSaver.SaveUser(ctx, name, email, phone, passHash, 1, basket_id)
 	if err != nil {
 		if errors.Is(err, storage.ErrUserExists) {
 			log.Warn("user already exist", slog.Any("error", err.Error()))
