@@ -24,9 +24,17 @@ func New(t *testing.T) (context.Context, *Suite) {
 
 	cfg := config.MustLoadPath(configPath())
 
+	log := slog.New(
+		slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}))
+
 	ctx, cancelCtx := context.WithTimeout(context.Background(), time.Duration(time.Hour))
 
-	authService := auth.New(&slog.Logger{}, &mocks.UserSaver{}, &mocks.UserProvider{}, time.Duration(time.Hour))
+	usrSaver := mocks.NewUserSaver(t)
+	usrProvider := mocks.NewUserProvider(t)
+
+	authService := auth.New(log, usrSaver, usrProvider, time.Duration(time.Hour))
 
 	t.Cleanup(func() {
 		t.Helper()
