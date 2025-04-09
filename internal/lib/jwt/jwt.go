@@ -16,6 +16,7 @@ func NewToken(user models.User, duration time.Duration) (string, error) {
 	claims["uid"] = user.ID
 	claims["email"] = user.Email
 	claims["exp"] = time.Now().Add(duration).Unix()
+	// claims["app_id"] = app.ID
 
 	tokenString, err := token.SignedString([]byte(user.Email))
 	if err != nil {

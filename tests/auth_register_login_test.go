@@ -1,11 +1,8 @@
-package auth
+package tests
 
 import (
-	"context"
-	"log/slog"
-	"premium_caste/internal/services/auth/mocks"
+	"premium_caste/tests/suite"
 	"testing"
-	"time"
 
 	"github.com/brianvoe/gofakeit"
 	"github.com/stretchr/testify/assert"
@@ -18,22 +15,20 @@ const (
 )
 
 func TestRegisterLogin_Login_HappyPath(t *testing.T) {
-	ttl := time.Duration(time.Hour) // need get from config
-
-	ctx := context.Background()
+	ctx, st := suite.New(t)
 
 	email := gofakeit.Email()
 	pass := randomFakePassword()
 	phone := gofakeit.Contact().Phone
 	name := gofakeit.FirstName()
 
-	authService := New(&slog.Logger{}, mocks.NewUserSaver(t), mocks.NewUserProvider(t), ttl)
+	// authService := New(&slog.Logger{}, mocks.NewUserSaver(t), mocks.NewUserProvider(t), ttl)
 
-	respReg, err := authService.RegisterNewUser(ctx, name, email, phone, pass, 1)
+	respReg, err := st.AuthService.RegisterNewUser(ctx, name, email, phone, pass, 1)
 	require.NoError(t, err)
 	assert.NotEmpty(t, respReg)
 
-	// respLogin, err := authService.Login(ctx, email, pass)
+	// respLogin, err := st.AuthService.Login(ctx, email, pass)
 	// require.NoError(t, err)
 	// assert.NotEmpty(t, respLogin)
 

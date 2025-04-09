@@ -21,7 +21,7 @@ func main() {
 
 	log := setupLogger(cfg.Env)
 
-	application := app.New(log, cfg.DSN, cfg.HTTP.Host, cfg.HTTP.Port)
+	_ = app.New(log, cfg.DSN, cfg.HTTP.Host, cfg.HTTP.Port, cfg.TokenTTL)
 
 	// go func() {
 	// 	application.GRPCServer.MustRun()
