@@ -14,6 +14,34 @@ type UserProvider struct {
 	mock.Mock
 }
 
+// IsAdmin provides a mock function with given fields: ctx, userID
+func (_m *UserProvider) IsAdmin(ctx context.Context, userID int64) (bool, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsAdmin")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (bool, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) bool); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // User provides a mock function with given fields: ctx, email
 func (_m *UserProvider) User(ctx context.Context, email string) (models.User, error) {
 	ret := _m.Called(ctx, email)

@@ -36,6 +36,7 @@ type UserSaver interface {
 
 type UserProvider interface {
 	User(ctx context.Context, email string) (models.User, error)
+	IsAdmin(ctx context.Context, userID int64) (bool, error)
 }
 
 func New(log *slog.Logger, userSaver UserSaver, userProvider UserProvider, tokenTTL time.Duration) *Auth {
@@ -123,4 +124,24 @@ func (a *Auth) RegisterNewUser(ctx context.Context, name, email, phone, pass str
 	log.Info("user register")
 
 	return id, nil
+}
+
+func (a *Auth) IsAdmin(ctx context.Context, userID int64) (bool, error) {
+	const op = "Auth.IsAdmin"
+
+	log := a.log.With(
+		slog.String("op", op),
+		slog.Int64("user_id", userID),
+	)
+
+	log.Info("checking if user is admin")
+
+	isAdmin, err := a.usrProvider.IsAdmin(ctx, userID)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
+
+	log.Info("checked if user is admin", slog.Bool("is_admin", isAdmin))
+
+	return isAdmin, nil
 }

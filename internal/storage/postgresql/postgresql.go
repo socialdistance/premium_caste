@@ -107,4 +107,8 @@ func (s *Storage) User(ctx context.Context, email string) (models.User, error) {
 	return user, nil
 }
 
+func (s *Storage) IsAdmin(ctx context.Context, userID int64) (bool, error) {
+	panic("implement me")
+}
+
 // Basket returns table basket by user id
