@@ -36,11 +36,11 @@ func New(t *testing.T) (context.Context, *Suite) {
 	usrSaver := mocks.NewUserSaver(t)
 	usrProvider := mocks.NewUserProvider(t)
 
-	var id int64
+	var monkeyID int64 = 15
 
-	usrSaver.On("SaveUser", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.Anything, mock.AnythingOfType("int"), mock.Anything).Return(id, nil)
+	usrSaver.On("SaveUser", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.Anything, mock.AnythingOfType("int"), mock.Anything).Return(monkeyID, nil)
 
-	// usrProvider.On("User", mock.AnythingOfType("context.Context"), mock.AnythingOfType("string")).Return(usrProvider.TestData().Value().Data(), errors.New("Error"))
+	// usrProvider.On("User", mock.Anything, mock.AnythingOfType("string")).Return(, errors.New("Error"))
 
 	authService := auth.New(log, usrSaver, usrProvider, time.Duration(time.Hour))
 
