@@ -10,6 +10,8 @@ import (
 	"premium_caste/internal/config"
 	"premium_caste/internal/services/auth"
 	"premium_caste/internal/services/auth/mocks"
+
+	"github.com/stretchr/testify/mock"
 )
 
 type Suite struct {
@@ -33,6 +35,12 @@ func New(t *testing.T) (context.Context, *Suite) {
 
 	usrSaver := mocks.NewUserSaver(t)
 	usrProvider := mocks.NewUserProvider(t)
+
+	var id int64
+
+	usrSaver.On("SaveUser", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.Anything, mock.AnythingOfType("int"), mock.Anything).Return(id, nil)
+
+	// usrProvider.On("User", mock.AnythingOfType("context.Context"), mock.AnythingOfType("string")).Return(usrProvider.TestData().Value().Data(), errors.New("Error"))
 
 	authService := auth.New(log, usrSaver, usrProvider, time.Duration(time.Hour))
 

@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"premium_caste/tests/suite"
 	"testing"
 
@@ -22,9 +23,8 @@ func TestRegisterLogin_Login_HappyPath(t *testing.T) {
 	phone := gofakeit.Contact().Phone
 	name := gofakeit.FirstName()
 
-	// authService := New(&slog.Logger{}, mocks.NewUserSaver(t), mocks.NewUserProvider(t), ttl)
-
 	respReg, err := st.AuthService.RegisterNewUser(ctx, name, email, phone, pass, 1)
+	fmt.Println(respReg, err)
 	require.NoError(t, err)
 	assert.NotEmpty(t, respReg)
 
