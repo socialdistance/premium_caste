@@ -112,3 +112,43 @@ func (s *Storage) IsAdmin(ctx context.Context, userID int64) (bool, error) {
 }
 
 // Basket returns table basket by user id
+
+// func AddMediaToGroup(db *sql.DB, groupID, mediaID uuid.UUID) error {
+//     tx, err := db.Begin()
+//     if err != nil {
+//         return fmt.Errorf("failed to begin transaction: %w", err)
+//     }
+//     defer tx.Rollback() // Откатываем в случае ошибки
+
+//     // Проверяем существование группы
+//     var groupExists bool
+//     err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM media_groups WHERE id = $1)`, groupID).Scan(&groupExists)
+//     if err != nil {
+//         return fmt.Errorf("failed to check group existence: %w", err)
+//     }
+//     if !groupExists {
+//         return fmt.Errorf("media group %s does not exist", groupID)
+//     }
+
+//     // Проверяем существование медиа
+//     var mediaExists bool
+//     err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM media WHERE id = $1)`, mediaID).Scan(&mediaExists)
+//     if err != nil {
+//         return fmt.Errorf("failed to check media existence: %w", err)
+//     }
+//     if !mediaExists {
+//         return fmt.Errorf("media file %s does not exist", mediaID)
+//     }
+
+//     // Добавляем связь
+//     _, err = tx.Exec(`
+//         INSERT INTO media_group_items (group_id, media_id)
+//         VALUES ($1, $2)
+//         ON CONFLICT (group_id, media_id) DO NOTHING`,
+//         groupID, mediaID)
+//     if err != nil {
+//         return fmt.Errorf("failed to add media to group: %w", err)
+//     }
+
+//     return tx.Commit()
+// }

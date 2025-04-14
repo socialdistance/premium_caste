@@ -2,12 +2,12 @@ package app
 
 import (
 	"context"
+	"time"
+	"log/slog"
+
+	httpapp "premium_caste/internal/app/http"
 	"premium_caste/internal/services/auth"
 	"premium_caste/internal/storage/postgresql"
-	"time"
-
-	"log/slog"
-	httpapp "premium_caste/internal/app/http"
 )
 
 type App struct {
