@@ -66,3 +66,7 @@ VALUES ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Мои котики');
 -- ORDER BY mgi.position;
 
 -- +goose Down
+DROP TABLE media_group_items;
+DROP TABLE media_groups;
+DROP TABLE media;
+-- DROP EXTENSION pgcrypto;

@@ -40,14 +40,14 @@ func TestStorage(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEmpty(t, id)
 
+		user, err := storage.User(ctx, email)
+		require.NoError(t, err)
+		require.NotEmpty(t, user)
+
 		err = tx.Rollback(ctx)
 		if err != nil {
 			t.Fatal("Failed to rollback tx", err)
 		}
-
-		user, err := storage.User(ctx, email)
-		require.NoError(t, err)
-		require.NotEmpty(t, user)
 	})
 }
 

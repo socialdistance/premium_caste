@@ -15,22 +15,24 @@ type UserSaver struct {
 }
 
 // SaveUser provides a mock function with given fields: ctx, name, email, phone, password, permissionId, basketId
-func (_m *UserSaver) SaveUser(ctx context.Context, name string, email string, phone string, password []byte, permissionId int, basketId uuid.UUID) (int64, error) {
+func (_m *UserSaver) SaveUser(ctx context.Context, name string, email string, phone string, password []byte, permissionId int, basketId uuid.UUID) (uuid.UUID, error) {
 	ret := _m.Called(ctx, name, email, phone, password, permissionId, basketId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SaveUser")
 	}
 
-	var r0 int64
+	var r0 uuid.UUID
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, []byte, int, uuid.UUID) (int64, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, []byte, int, uuid.UUID) (uuid.UUID, error)); ok {
 		return rf(ctx, name, email, phone, password, permissionId, basketId)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, []byte, int, uuid.UUID) int64); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, []byte, int, uuid.UUID) uuid.UUID); ok {
 		r0 = rf(ctx, name, email, phone, password, permissionId, basketId)
 	} else {
-		r0 = ret.Get(0).(int64)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(uuid.UUID)
+		}
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, []byte, int, uuid.UUID) error); ok {

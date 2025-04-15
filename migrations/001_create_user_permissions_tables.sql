@@ -1,20 +1,23 @@
 -- +goose Up
-CREATE TABLE "public"."permissions" (
-    "id" int2 NOT NULL,
-    "permission" varchar(255) NOT NULL,
-    PRIMARY KEY ("id")
-);
+-- Enable pgcrypto extension for UUID generation
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE "public"."users" (
-    "id" int2 NOT NULL DEFAULT nextval('users_id_seq1'::regclass),
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     "name" varchar NOT NULL,
     "email" varchar NOT NULL,
     "phone" varchar(255) NOT NULL,
     "password" varchar(255) NOT NULL,
     "permission_id" int2 NOT NULL,
     "basket_id" uuid,
-    "registration_date" timestamp,
-    "last_login" timestamp,
+    "registration_date" TIMESTAMPTZ NOT NULL DEFAULT NOW(), 
+    "last_login" timestamp
+);
+
+
+CREATE TABLE "public"."permissions" (
+    "id" int2 NOT NULL,
+    "permission" varchar(255) NOT NULL,
     PRIMARY KEY ("id")
 );
 

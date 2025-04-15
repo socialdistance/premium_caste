@@ -31,7 +31,7 @@ type Auth struct {
 
 //go:generate go run github.com/vektra/mockery/v2@v2.53.3 --all
 type UserSaver interface {
-	SaveUser(ctx context.Context, name, email, phone string, password []byte, permissionId int, basketId uuid.UUID) (int64, error)
+	SaveUser(ctx context.Context, name, email, phone string, password []byte, permissionId int, basketId uuid.UUID) (uuid.UUID, error)
 }
 
 type UserProvider interface {
@@ -89,7 +89,7 @@ func (a *Auth) Login(ctx context.Context, email, password string) (string, error
 	return token, nil
 }
 
-func (a *Auth) RegisterNewUser(ctx context.Context, name, email, phone, pass string, permission_id int) (int64, error) {
+func (a *Auth) RegisterNewUser(ctx context.Context, name, email, phone, pass string, permission_id int) (uuid.UUID, error) {
 	const op = "auth.RegisterNewUser"
 
 	log := a.log.With(
@@ -103,7 +103,7 @@ func (a *Auth) RegisterNewUser(ctx context.Context, name, email, phone, pass str
 	if err != nil {
 		log.Error("failed to generate password hash", sl.Err(err))
 
-		return 0, fmt.Errorf("%s: %w", op, err)
+		return uuid.Nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	basket_id := uuid.New()
@@ -113,12 +113,12 @@ func (a *Auth) RegisterNewUser(ctx context.Context, name, email, phone, pass str
 		if errors.Is(err, storage.ErrUserExists) {
 			log.Warn("user already exist", slog.Any("error", err.Error()))
 
-			return 0, fmt.Errorf("%s: %w", op, ErrUserExist)
+			return uuid.Nil, fmt.Errorf("%s: %w", op, ErrUserExist)
 		}
 
 		log.Error("failed to save user", sl.Err(err))
 
-		return 0, fmt.Errorf("%s: %w", op, err)
+		return uuid.Nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	log.Info("user register")
