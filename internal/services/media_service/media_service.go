@@ -1,16 +1,16 @@
-package service
+package services
 
 import (
 	"context"
 	"fmt"
 	"premium_caste/internal/domain/models"
+	"premium_caste/internal/repository"
+	storage "premium_caste/internal/storage/filestorage"
 	"premium_caste/pkg/dto"
 	"time"
 
 	"github.com/google/uuid"
 )
-
-// t
 
 type MediaService struct {
 	repo        repository.MediaRepository

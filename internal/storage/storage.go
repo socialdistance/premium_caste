@@ -9,3 +9,9 @@ var (
 	ErrAppList      = errors.New("no such apps")
 	ErrorNoSuchKey  = errors.New("no such key")
 )
+
+var (
+	ErrFileTooLarge    = errors.New("file size exceeds limit")
+	ErrInvalidFileType = errors.New("invalid file type")
+	ErrFileNotFound    = errors.New("file not found")
+)

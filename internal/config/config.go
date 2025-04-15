@@ -9,15 +9,22 @@ import (
 )
 
 type Config struct {
-	Env      string        `yaml:"env" env-default:"local"`
-	DSN      string        `yaml:"dsn" env-required:"true"`
-	TokenTTL time.Duration `yaml:"token_ttl" env-default:"1h"`
-	HTTP     HTTPConfig    `yaml:"http"`
+	Env         string            `yaml:"env" env-default:"local"`
+	DSN         string            `yaml:"dsn" env-required:"true"`
+	TokenTTL    time.Duration     `yaml:"token_ttl" env-default:"1h"`
+	HTTP        HTTPConfig        `yaml:"http"`
+	FileStorage FileStorageConfig `yaml:file_storage`
 }
 
 type HTTPConfig struct {
 	Host string `yaml:"host"`
 	Port string `yaml:"port" env-default:"8080"`
+}
+
+type FileStorageConfig struct {
+	BaseDir string `yaml:"base_dir"`
+	BaseURL string `yaml:"base_url"`
+	MaxSize int64  `yaml:"max_size"` // Максимальный размер файла в байтах
 }
 
 func MustLoad() *Config {
