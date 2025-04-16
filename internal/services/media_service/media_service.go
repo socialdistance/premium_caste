@@ -3,32 +3,49 @@ package services
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"path/filepath"
+
 	"premium_caste/internal/domain/models"
+	"premium_caste/internal/lib/logger/sl"
 	"premium_caste/internal/repository"
 	storage "premium_caste/internal/storage/filestorage"
-	"premium_caste/pkg/dto"
+	"premium_caste/internal/transport/http/dto"
+
 	"time"
 
 	"github.com/google/uuid"
 )
 
 type MediaService struct {
+	log         *slog.Logger
 	repo        repository.MediaRepository
 	fileStorage storage.FileStorage
 }
 
-func NewMediaService(repo repository.MediaRepository, fileStorage storage.FileStorage) *MediaService {
+func NewMediaService(log *slog.Logger, repo repository.MediaRepository, fileStorage storage.FileStorage) *MediaService {
 	return &MediaService{
+		log:         log,
 		repo:        repo,
 		fileStorage: fileStorage,
 	}
 }
 
 func (s *MediaService) UploadMedia(ctx context.Context, input dto.MediaUploadInput) (*models.Media, error) {
-	// 1. Сохраняем файл в хранилище
-	filePath, fileSize, err := s.fileStorage.Save(ctx, input.File)
+	const op = "media_service.UploadMedia"
+
+	log := s.log.With(
+		slog.String("op", op),
+		slog.String("media_type", input.MediaType),
+	)
+
+	log.Info("upload media")
+
+	filePath, fileSize, err := s.fileStorage.Save(ctx, input.File, filepath.Join("user_uploads", input.UploaderID.String()))
 	if err != nil {
-		return nil, fmt.Errorf("failed to save file: %w", err)
+		log.Error("failed to save file", sl.Err(err))
+
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	// 2. Создаем доменную модель
@@ -52,7 +69,9 @@ func (s *MediaService) UploadMedia(ctx context.Context, input dto.MediaUploadInp
 	if err := media.Validate(); err != nil {
 		// Удаляем сохраненный файл при ошибке валидации
 		_ = s.fileStorage.Delete(ctx, filePath)
-		return nil, fmt.Errorf("media validation failed: %w", err)
+		log.Error("media validation failed", sl.Err(err))
+
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	// 4. Сохраняем в БД
@@ -60,7 +79,9 @@ func (s *MediaService) UploadMedia(ctx context.Context, input dto.MediaUploadInp
 	if err != nil {
 		// Удаляем файл если не удалось сохранить в БД
 		_ = s.fileStorage.Delete(ctx, filePath)
-		return nil, fmt.Errorf("failed to save media to database: %w", err)
+		log.Error("failed to save media to database", sl.Err(err))
+
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	return createdMedia, nil
