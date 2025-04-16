@@ -62,39 +62,6 @@ func (r *UserRepo) SaveUser(ctx context.Context, user models.User) (uuid.UUID, e
 	return id, nil
 }
 
-func (r *UserRepo) GetUserByEmail(ctx context.Context, email string) (models.User, error) {
-	const op = "repository.user.GetUserByEmail"
-
-	query, args, err := r.sb.Select(
-		"id",
-		"name",
-		"email",
-		"password",
-		"permission_id",
-		"basket_id",
-	).
-		From("users").
-		Where(sq.Eq{"email": email}).
-		ToSql()
-	if err != nil {
-		return models.User{}, fmt.Errorf("%s: %w", op, err)
-	}
-
-	var user models.User
-	err = r.db.QueryRow(ctx, query, args...).Scan(
-		&user.ID,
-		&user.Name,
-		&user.Email,
-		&user.Password,
-		&user.PermissionID,
-		&user.BasketID,
-	)
-	if err != nil {
-		return models.User{}, fmt.Errorf("%s: %w", op, err)
-	}
-
-	return user, nil
-}
 func (r *UserRepo) User(ctx context.Context, email string) (models.User, error) {
 	const op = "storage.postgresql.User"
 

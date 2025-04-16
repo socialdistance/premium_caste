@@ -90,7 +90,7 @@ func (r *MediaRepo) CreateMedia(ctx context.Context, media *models.Media) (*mode
 }
 
 // AddMediaToGroup добавляет медиа в группу (связь many-to-many)
-func (r *MediaRepo) AddMediaToGroup(ctx context.Context, groupID, mediaID uuid.UUID) error {
+func (r *MediaRepo) AddMedia(ctx context.Context, groupID, mediaID uuid.UUID) error {
 	const op = "storage.postgresql.AddMediaToGroup"
 
 	query, args, err := r.sb.Insert("media_group_items").

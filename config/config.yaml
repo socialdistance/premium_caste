@@ -4,3 +4,7 @@ token_ttl: 1h
 http:
   host: "127.0.0.1"
   port: "8080"
+file_storage:
+  base_dir: "./uploads"
+  base_url: "http://localhost:8080/uploads"
+  max_size: 10485760  # 10MB

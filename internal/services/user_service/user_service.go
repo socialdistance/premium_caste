@@ -5,10 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
+
+	"premium_caste/internal/domain/models"
 	"premium_caste/internal/lib/jwt"
 	"premium_caste/internal/lib/logger/sl"
 	"premium_caste/internal/repository"
 	"premium_caste/internal/storage"
+	"premium_caste/internal/transport/http/dto"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -21,64 +25,52 @@ var (
 )
 
 type UserService struct {
-	repo repository.UserRepository
+	log      *slog.Logger
+	repo     repository.UserRepository
+	tokenTTL time.Duration
 }
 
-func NewUserService(repo repository.UserRepository) *UserService {
-	return &UserService{repo: repo}
+func NewUserService(log *slog.Logger, repo repository.UserRepository, tokenTTL time.Duration) *UserService {
+	return &UserService{
+		log:      log,
+		repo:     repo,
+		tokenTTL: tokenTTL,
+	}
 }
 
-// func (s *UserService) RegisterUser(ctx context.Context, input UserRegisterInput) (uuid.UUID, error) {
-// 	user := models.User{
-// 		Name:         input.Name,
-// 		Email:        input.Email,
-// 		Phone:        input.Phone,
-// 		Password:     input.Password,
-// 		PermissionID: input.PermissionID,
-// 		BasketID:     uuid.New(),
-// 	}
+func (u *UserService) Login(ctx context.Context, email, password string) (string, error) {
+	const op = "user_service.Login"
 
-// 	id, err := s.repo.SaveUser(ctx, user)
-// 	if err != nil {
-// 		return uuid.Nil, fmt.Errorf("failed to register user: %w", err)
-// 	}
-
-// 	return id, nil
-// }
-
-func (a *UserService) Login(ctx context.Context, email, password string) (string, error) {
-	const op = "auth.Login"
-
-	log := a.log.With(
+	log := u.log.With(
 		slog.String("op", op),
 		slog.String("username", email),
 	)
 
 	log.Info("attempting to login user")
 
-	user, err := a.usrProvider.User(ctx, email)
+	user, err := u.repo.User(ctx, email)
 	if err != nil {
 		if errors.Is(err, storage.ErrUserNotFound) {
-			a.log.Warn("user not found", sl.Err(err))
+			u.log.Warn("user not found", sl.Err(err))
 
 			return "", fmt.Errorf("%s: %w", op, ErrInvalidCredentials)
 		}
-		a.log.Error("failed to get user", sl.Err(err))
+		u.log.Error("failed to get user", sl.Err(err))
 
 		return "", fmt.Errorf("%s: %w", op, err)
 	}
 
 	if err := bcrypt.CompareHashAndPassword(user.Password, []byte(password)); err != nil {
-		a.log.Info("invalid credentials", sl.Err(err))
+		u.log.Info("invalid credentials", sl.Err(err))
 
 		return "", fmt.Errorf("%s: %w", op, ErrInvalidCredentials)
 	}
 
 	log.Info("user logged in successfully")
 
-	token, err := jwt.NewToken(user, a.tokenTTL)
+	token, err := jwt.NewToken(user, u.tokenTTL)
 	if err != nil {
-		a.log.Error("failed to generate token", sl.Err(err))
+		u.log.Error("failed to generate token", sl.Err(err))
 
 		return "", fmt.Errorf("%s: %w", op, err)
 	}
@@ -86,26 +78,33 @@ func (a *UserService) Login(ctx context.Context, email, password string) (string
 	return token, nil
 }
 
-func (a *Auth) RegisterNewUser(ctx context.Context, name, email, phone, pass string, permission_id int) (uuid.UUID, error) {
-	const op = "auth.RegisterNewUser"
+func (u *UserService) RegisterNewUser(ctx context.Context, input dto.UserRegisterInput) (uuid.UUID, error) {
+	const op = "user_service.RegisterNewUser"
 
-	log := a.log.With(
+	log := u.log.With(
 		slog.String("op", op),
-		slog.String("email", email),
+		slog.String("email", input.Email),
 	)
 
 	log.Info("register user")
 
-	passHash, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
+	passHash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
 		log.Error("failed to generate password hash", sl.Err(err))
 
 		return uuid.Nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	basket_id := uuid.New()
+	user := models.User{
+		Name:         input.Name,
+		Email:        input.Email,
+		Phone:        input.Phone,
+		Password:     passHash,
+		PermissionID: input.PermissionID,
+		BasketID:     uuid.New(),
+	}
 
-	id, err := a.usrSaver.SaveUser(ctx, name, email, phone, passHash, permission_id, basket_id)
+	id, err := u.repo.SaveUser(ctx, user)
 	if err != nil {
 		if errors.Is(err, storage.ErrUserExists) {
 			log.Warn("user already exist", slog.Any("error", err.Error()))
@@ -123,17 +122,17 @@ func (a *Auth) RegisterNewUser(ctx context.Context, name, email, phone, pass str
 	return id, nil
 }
 
-func (a *Auth) IsAdmin(ctx context.Context, userID int64) (bool, error) {
-	const op = "Auth.IsAdmin"
+func (u *UserService) IsAdmin(ctx context.Context, userID int64) (bool, error) {
+	const op = "user_service.IsAdmin"
 
-	log := a.log.With(
+	log := u.log.With(
 		slog.String("op", op),
 		slog.Int64("user_id", userID),
 	)
 
 	log.Info("checking if user is admin")
 
-	isAdmin, err := a.usrProvider.IsAdmin(ctx, userID)
+	isAdmin, err := u.repo.IsAdmin(ctx, userID)
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", op, err)
 	}

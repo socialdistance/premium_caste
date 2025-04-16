@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"os"
@@ -14,6 +15,7 @@ type FileStorage interface {
 	Delete(ctx context.Context, filePath string) error
 	GetFullPath(relativePath string) string
 	BaseURL() string
+	GetBaseDir() string
 }
 
 // LocalFileStorage реализация для локальной файловой системы
@@ -35,37 +37,55 @@ func NewLocalFileStorage(baseDir, baseURL string) (*LocalFileStorage, error) {
 }
 
 func (s *LocalFileStorage) Save(ctx context.Context, file *multipart.FileHeader, subPath string) (string, int64, error) {
-	// Создаем полный путь к файлу
-	filePath := filepath.Join(s.baseDir, subPath, file.Filename)
-
-	// Создаем все необходимые поддиректории
-	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+	if err := ctx.Err(); err != nil {
 		return "", 0, err
 	}
 
-	// Открываем исходный файл
+	filePath := filepath.Join(s.baseDir, subPath, file.Filename)
+
+	select {
+	case <-ctx.Done():
+		return "", 0, ctx.Err()
+	default:
+		if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+			return "", 0, fmt.Errorf("failed to create directories: %w", err)
+		}
+	}
+
 	src, err := file.Open()
 	if err != nil {
-		return "", 0, err
+		return "", 0, fmt.Errorf("failed to open source file: %w", err)
 	}
 	defer src.Close()
 
-	// Создаем новый файл
+	// Создаем целевой файл
 	dst, err := os.Create(filePath)
 	if err != nil {
-		return "", 0, err
+		return "", 0, fmt.Errorf("failed to create destination file: %w", err)
 	}
 	defer dst.Close()
 
-	// Копируем содержимое
-	size, err := io.Copy(dst, src)
-	if err != nil {
-		return "", 0, err
+	done := make(chan struct{})
+	var size int64
+	var copyErr error
+
+	go func() {
+		size, copyErr = io.Copy(dst, src)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		if copyErr != nil {
+			_ = os.Remove(filePath)
+			return "", 0, fmt.Errorf("failed to copy file: %w", copyErr)
+		}
+	case <-ctx.Done():
+		_ = os.Remove(filePath)
+		return "", 0, ctx.Err()
 	}
 
-	// Возвращаем относительный путь и размер
-	relativePath := filepath.Join(subPath, file.Filename)
-	return relativePath, size, nil
+	return filepath.Join(subPath, file.Filename), size, nil
 }
 
 // Delete удаляет файл из хранилища
@@ -84,28 +104,6 @@ func (s *LocalFileStorage) BaseURL() string {
 	return s.baseURL
 }
 
-// func (s *LocalFileStorage) validateFile(file *multipart.FileHeader) error {
-// 	// Проверка размера файла
-// 	if s.config.MaxSize > 0 && file.Size > s.config.MaxSize {
-// 		return storage.ErrFileTooLarge
-// 	}
-
-// 	// Проверка MIME-типа
-// 	if !isAllowedType(file.Header.Get("Content-Type")) {
-// 		return storage.ErrInvalidFileType
-// 	}
-
-// 	return nil
-// }
-
-// func generateFilename(originalName string) string {
-// 	ext := filepath.Ext(originalName)
-// 	return uuid.New().String() + ext
-// }
-
-// func (s *LocalFileStorage) Save(ctx context.Context, file *multipart.FileHeader, subPath string) (string, int64, error) {
-// 	logger := log.FromContext(ctx)
-// 	logger.Info("Saving file", "filename", file.Filename)
-
-// 	// ... остальная реализация
-// }
+func (s *LocalFileStorage) GetBaseDir() string {
+	return s.baseDir
+}

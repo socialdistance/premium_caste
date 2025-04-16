@@ -5,7 +5,6 @@ go 1.23.0
 require (
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/arl/statsviz v0.6.0
-	github.com/brianvoe/gofakeit v3.18.0+incompatible
 	github.com/fatih/color v1.18.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0

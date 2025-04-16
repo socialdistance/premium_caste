@@ -13,7 +13,7 @@ type Config struct {
 	DSN         string            `yaml:"dsn" env-required:"true"`
 	TokenTTL    time.Duration     `yaml:"token_ttl" env-default:"1h"`
 	HTTP        HTTPConfig        `yaml:"http"`
-	FileStorage FileStorageConfig `yaml:file_storage`
+	FileStorage FileStorageConfig `yaml:"file_storage"`
 }
 
 type HTTPConfig struct {
@@ -24,7 +24,7 @@ type HTTPConfig struct {
 type FileStorageConfig struct {
 	BaseDir string `yaml:"base_dir"`
 	BaseURL string `yaml:"base_url"`
-	MaxSize int64  `yaml:"max_size"` // Максимальный размер файла в байтах
+	MaxSize int64  `yaml:"max_size"`
 }
 
 func MustLoad() *Config {

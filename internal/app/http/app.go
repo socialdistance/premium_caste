@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	httprouters "premium_caste/internal/http"
+	httprouters "premium_caste/internal/transport/http"
 
 	"github.com/arl/statsviz"
 	"github.com/labstack/echo/v4"
