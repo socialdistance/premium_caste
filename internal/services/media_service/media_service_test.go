@@ -24,6 +24,26 @@ type MockMediaRepository struct {
 	mock.Mock
 }
 
+func (m *MockMediaRepository) AddMedia(ctx context.Context, groupID, mediaID uuid.UUID) error {
+	args := m.Called(ctx, groupID, mediaID)
+	return args.Error(0)
+}
+
+// FindByID ищет медиа по ID
+func (m *MockMediaRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.Media, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Media), args.Error(1)
+}
+
+// UpdateMedia обновляет данные медиа
+func (m *MockMediaRepository) UpdateMedia(ctx context.Context, media *models.Media) error {
+	args := m.Called(ctx, media)
+	return args.Error(0)
+}
+
 func (m *MockMediaRepository) CreateMedia(ctx context.Context, media *models.Media) (*models.Media, error) {
 	args := m.Called(ctx, media)
 	return args.Get(0).(*models.Media), args.Error(1)
@@ -32,6 +52,24 @@ func (m *MockMediaRepository) CreateMedia(ctx context.Context, media *models.Med
 // Мок хранилища файлов
 type MockFileStorage struct {
 	mock.Mock
+}
+
+// BaseURL implements storage.FileStorage.
+func (m *MockFileStorage) BaseURL() string {
+	args := m.Called()
+	return args.String(0)
+}
+
+// GetBaseDir implements storage.FileStorage.
+func (m *MockFileStorage) GetBaseDir() string {
+	args := m.Called()
+	return args.String(0)
+}
+
+// GetFullPath implements storage.FileStorage.
+func (m *MockFileStorage) GetFullPath(relativePath string) string {
+	args := m.Called(relativePath)
+	return args.String(0)
 }
 
 func (m *MockFileStorage) Save(ctx context.Context, file *multipart.FileHeader, subPath string) (string, int64, error) {
@@ -161,4 +199,51 @@ func TestMediaService_UploadMedia(t *testing.T) {
 		assert.ErrorContains(t, err, "validation failed")
 		mockStorage.AssertExpectations(t)
 	})
+}
+
+func TestFileStorageMethods(t *testing.T) {
+	storageMock := new(MockFileStorage)
+
+	// Настройка ожиданий
+	storageMock.On("BaseURL").Return("https://storage.example.com")
+	storageMock.On("GetBaseDir").Return("/data/storage")
+	storageMock.On("GetFullPath", "images/1.jpg").Return("/data/storage/images/1.jpg")
+
+	// Проверка BaseURL
+	assert.Equal(t, "https://storage.example.com", storageMock.BaseURL())
+
+	// Проверка GetBaseDir
+	assert.Equal(t, "/data/storage", storageMock.GetBaseDir())
+
+	// Проверка GetFullPath
+	assert.Equal(t, "/data/storage/images/1.jpg", storageMock.GetFullPath("images/1.jpg"))
+
+	// Верификация вызовов
+	storageMock.AssertExpectations(t)
+}
+
+func TestMediaRepositoryMethods(t *testing.T) {
+	repoMock := new(MockMediaRepository)
+	testMedia := &models.Media{ID: uuid.New()}
+	groupID := uuid.New()
+	mediaID := uuid.New()
+
+	// Настройка ожиданий
+	repoMock.On("AddMedia", mock.Anything, groupID, mediaID).Return(nil)
+	repoMock.On("FindByID", mock.Anything, testMedia.ID).Return(testMedia, nil)
+	repoMock.On("UpdateMedia", mock.Anything, testMedia).Return(nil)
+
+	// Проверка AddMedia
+	assert.NoError(t, repoMock.AddMedia(context.Background(), groupID, mediaID))
+
+	// Проверка FindByID
+	found, err := repoMock.FindByID(context.Background(), testMedia.ID)
+	assert.NoError(t, err)
+	assert.Equal(t, testMedia, found)
+
+	// Проверка UpdateMedia
+	assert.NoError(t, repoMock.UpdateMedia(context.Background(), testMedia))
+
+	// Верификация вызовов
+	repoMock.AssertExpectations(t)
 }
