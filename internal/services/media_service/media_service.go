@@ -39,7 +39,7 @@ func (s *MediaService) UploadMedia(ctx context.Context, input dto.MediaUploadInp
 		slog.String("media_type", input.MediaType),
 	)
 
-	log.Info("upload media")
+	// log.Info("upload media")
 
 	filePath, fileSize, err := s.fileStorage.Save(ctx, input.File, filepath.Join("user_uploads", input.UploaderID.String()))
 	if err != nil {
