@@ -16,7 +16,8 @@ type UserRepository interface {
 
 type MediaRepository interface {
 	CreateMedia(ctx context.Context, media *models.Media) (*models.Media, error)
-	AddMedia(ctx context.Context, groupID, mediaID uuid.UUID) error
+	AddMediaGroup(ctx context.Context, ownerID uuid.UUID, description string) error
+	AddMediaGroupItems(ctx context.Context, groupID, mediaID uuid.UUID) error
 	UpdateMedia(ctx context.Context, media *models.Media) error
 	FindByID(ctx context.Context, id uuid.UUID) (*models.Media, error)
 }

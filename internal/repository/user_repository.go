@@ -26,8 +26,6 @@ func NewUserRepository(db *pgxpool.Pool) *UserRepo {
 }
 
 func (r *UserRepo) SaveUser(ctx context.Context, user models.User) (uuid.UUID, error) {
-	const op = "repository.user.SaveUser"
-
 	query, args, err := r.sb.Insert("users").
 		Columns(
 			"name",
@@ -50,29 +48,27 @@ func (r *UserRepo) SaveUser(ctx context.Context, user models.User) (uuid.UUID, e
 		Suffix("RETURNING id").
 		ToSql()
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("%s: %w", op, err)
+		return uuid.Nil, fmt.Errorf("%w", err)
 	}
 
 	var id uuid.UUID
 	err = r.db.QueryRow(ctx, query, args...).Scan(&id)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("%s: %w", op, err)
+		return uuid.Nil, fmt.Errorf("%w", err)
 	}
 
 	return id, nil
 }
 
 func (r *UserRepo) User(ctx context.Context, email string) (models.User, error) {
-	const op = "storage.postgresql.User"
-
 	sql, args, err := r.sb.Select("id", "name", "email", "password", "permission_id", "basket_id").From("users").Where(sq.Eq{"email": email}).PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
-		return models.User{}, fmt.Errorf("%s: can't build sql:%w", op, err)
+		return models.User{}, fmt.Errorf("can't build sql:%w", err)
 	}
 
 	rows, err := r.db.Query(ctx, sql, args...)
 	if err != nil {
-		return models.User{}, fmt.Errorf("%s, %w", op, err)
+		return models.User{}, fmt.Errorf("%w", err)
 	}
 
 	defer rows.Close()
@@ -82,7 +78,7 @@ func (r *UserRepo) User(ctx context.Context, email string) (models.User, error) 
 	for rows.Next() {
 		err = rows.Scan(&user.ID, &user.Name, &user.Email, &user.Password, &user.PermissionID, &user.BasketID)
 		if err != nil {
-			return models.User{}, fmt.Errorf("%s: %w", op, storage.ErrUserNotFound)
+			return models.User{}, fmt.Errorf("%w", storage.ErrUserNotFound)
 		}
 	}
 

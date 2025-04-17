@@ -25,8 +25,6 @@ func NewMediaRepository(db *pgxpool.Pool) *MediaRepo {
 }
 
 func (r *MediaRepo) CreateMedia(ctx context.Context, media *models.Media) (*models.Media, error) {
-	const op = "storage.postgresql.CreateMedia"
-
 	query, args, err := r.sb.Insert("media").
 		Columns(
 			"id",
@@ -61,7 +59,7 @@ func (r *MediaRepo) CreateMedia(ctx context.Context, media *models.Media) (*mode
 		Suffix("RETURNING *").
 		ToSql()
 	if err != nil {
-		return nil, fmt.Errorf("failed to build query: %s %w", op, err)
+		return nil, fmt.Errorf("failed to build query: %w", err)
 	}
 
 	row := r.db.QueryRow(ctx, query, args...)
@@ -83,23 +81,20 @@ func (r *MediaRepo) CreateMedia(ctx context.Context, media *models.Media) (*mode
 		&createdMedia.Metadata,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create media: %s %w", op, err)
+		return nil, fmt.Errorf("failed to create media: %w", err)
 	}
 
 	return &createdMedia, nil
 }
 
-// AddMediaToGroup добавляет медиа в группу (связь many-to-many)
-func (r *MediaRepo) AddMedia(ctx context.Context, groupID, mediaID uuid.UUID) error {
-	const op = "storage.postgresql.AddMediaToGroup"
+func (r *MediaRepo) AddMediaGroup(ctx context.Context, ownerID uuid.UUID, description string) error {
+	const op = "repository.media_repository.AddMedia"
 
-	query, args, err := r.sb.Insert("media_group_items").
-		Columns("group_id", "media_id", "position", "created_at").
+	query, args, err := r.sb.Insert("media_groups").
+		Columns("owner_id", "description").
 		Values(
-			groupID,
-			mediaID,
-			0, // Позиция по умолчанию
-			time.Now().UTC(),
+			ownerID,
+			description,
 		).
 		ToSql()
 	if err != nil {
@@ -115,8 +110,6 @@ func (r *MediaRepo) AddMedia(ctx context.Context, groupID, mediaID uuid.UUID) er
 }
 
 func (r *MediaRepo) UpdateMedia(ctx context.Context, media *models.Media) error {
-	const op = "storage.postgresql.UpdateMedia"
-
 	query, args, err := r.sb.Update("media").
 		Set("original_filename", media.OriginalFilename).
 		Set("is_public", media.IsPublic).
@@ -124,7 +117,7 @@ func (r *MediaRepo) UpdateMedia(ctx context.Context, media *models.Media) error 
 		Where(sq.Eq{"id": media.ID}).
 		ToSql()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to update media: %w", err)
 	}
 
 	_, err = r.db.Exec(ctx, query, args...)
@@ -132,9 +125,7 @@ func (r *MediaRepo) UpdateMedia(ctx context.Context, media *models.Media) error 
 }
 
 func (r *MediaRepo) FindByID(ctx context.Context, id uuid.UUID) (*models.Media, error) {
-	const op = "storage.postgresql.FindByID"
-
-	query, args, err := r.sb.Select("*").
+	query, args, err := sq.Select("*").
 		From("media").
 		Where(sq.Eq{"id": id}).
 		ToSql()
@@ -160,48 +151,131 @@ func (r *MediaRepo) FindByID(ctx context.Context, id uuid.UUID) (*models.Media, 
 		&media.Metadata,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get media: %s %w", op, err)
+		return nil, fmt.Errorf("failed to get media: %w", err)
 	}
 
 	return &media, nil
 }
 
-// func AddMediaToGroup(db *sql.DB, groupID, mediaID uuid.UUID) error {
-//     tx, err := db.Begin()
-//     if err != nil {
-//         return fmt.Errorf("failed to begin transaction: %w", err)
-//     }
-//     defer tx.Rollback() // Откатываем в случае ошибки
+func (r *MediaRepo) AddMediaGroupItems(ctx context.Context, groupID, mediaID uuid.UUID) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
 
-//     // Проверяем существование группы
-//     var groupExists bool
-//     err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM media_groups WHERE id = $1)`, groupID).Scan(&groupExists)
-//     if err != nil {
-//         return fmt.Errorf("failed to check group existence: %w", err)
-//     }
-//     if !groupExists {
-//         return fmt.Errorf("media group %s does not exist", groupID)
-//     }
+	var groupExists bool
+	err = tx.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM media_groups WHERE id = $1)`,
+		groupID).Scan(&groupExists)
+	if err != nil {
+		return fmt.Errorf("failed to check group existence: %w", err)
+	}
+	if !groupExists {
+		return fmt.Errorf("media group %s does not exist", groupID)
+	}
 
-//     // Проверяем существование медиа
-//     var mediaExists bool
-//     err = tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM media WHERE id = $1)`, mediaID).Scan(&mediaExists)
-//     if err != nil {
-//         return fmt.Errorf("failed to check media existence: %w", err)
-//     }
-//     if !mediaExists {
-//         return fmt.Errorf("media file %s does not exist", mediaID)
-//     }
+	var mediaExists bool
+	err = tx.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM media WHERE id = $1)`,
+		mediaID).Scan(&mediaExists)
+	if err != nil {
+		return fmt.Errorf("failed to check media existence: %w", err)
+	}
+	if !mediaExists {
+		return fmt.Errorf("media file %s does not exist", mediaID)
+	}
 
-//     // Добавляем связь
-//     _, err = tx.Exec(`
-//         INSERT INTO media_group_items (group_id, media_id)
-//         VALUES ($1, $2)
-//         ON CONFLICT (group_id, media_id) DO NOTHING`,
-//         groupID, mediaID)
-//     if err != nil {
-//         return fmt.Errorf("failed to add media to group: %w", err)
-//     }
+	query, args, err := r.sb.Insert("media_group_items").
+		Columns("group_id", "media_id", "position", "created_at").
+		Values(
+			groupID,
+			mediaID,
+			sq.Expr("(SELECT COALESCE(MAX(position), 0) + 1 FROM media_group_items WHERE group_id = ?)", groupID),
+			time.Now().UTC(),
+		).
+		Suffix("ON CONFLICT (group_id, media_id) DO NOTHING").
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("failed to build query: %w", err)
+	}
 
-//     return tx.Commit()
-// }
+	_, err = tx.Exec(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to add media to group: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// SELECT m.*
+// FROM media m
+// JOIN media_group_items mgi ON m.id = mgi.media_id
+// WHERE mgi.group_id = 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22'
+// ORDER BY mgi.position;
+func (r *MediaRepo) GetMediaByGroupID(ctx context.Context, groupID uuid.UUID) ([]models.Media, error) {
+	query, args, err := r.sb.
+		Select(
+			"m.id",
+			"m.uploader_id",
+			"m.created_at",
+			"m.media_type",
+			"m.original_filename",
+			"m.storage_path",
+			"m.file_size",
+			"m.mime_type",
+			"m.width",
+			"m.height",
+			"m.duration",
+			"m.is_public",
+			"m.metadata",
+		).
+		From("media m").
+		Join("media_group_items mgi ON m.id = mgi.media_id").
+		Where(sq.Eq{"mgi.group_id": groupID}).
+		OrderBy("mgi.position").
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var mediaList []models.Media
+	for rows.Next() {
+		var m models.Media
+		err := rows.Scan(
+			&m.ID,
+			&m.UploaderID,
+			&m.CreatedAt,
+			&m.MediaType,
+			&m.OriginalFilename,
+			&m.StoragePath,
+			&m.FileSize,
+			&m.MimeType,
+			&m.Width,
+			&m.Height,
+			&m.Duration,
+			&m.IsPublic,
+			&m.Metadata,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("row scanning failed: %w", err)
+		}
+
+		mediaList = append(mediaList, m)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+	return mediaList, nil
+}
