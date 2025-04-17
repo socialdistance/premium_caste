@@ -20,4 +20,5 @@ type MediaRepository interface {
 	AddMediaGroupItems(ctx context.Context, groupID, mediaID uuid.UUID) error
 	UpdateMedia(ctx context.Context, media *models.Media) error
 	FindByID(ctx context.Context, id uuid.UUID) (*models.Media, error)
+	GetMediaByGroupID(ctx context.Context, groupID uuid.UUID) ([]models.Media, error)
 }

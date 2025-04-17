@@ -125,12 +125,12 @@ func (r *MediaRepo) UpdateMedia(ctx context.Context, media *models.Media) error 
 }
 
 func (r *MediaRepo) FindByID(ctx context.Context, id uuid.UUID) (*models.Media, error) {
-	query, args, err := sq.Select("*").
+	query, args, err := r.sb.Select("*").
 		From("media").
 		Where(sq.Eq{"id": id}).
 		ToSql()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to find by id media: %w", err)
 	}
 
 	row := r.db.QueryRow(ctx, query, args...)
@@ -139,6 +139,7 @@ func (r *MediaRepo) FindByID(ctx context.Context, id uuid.UUID) (*models.Media, 
 	err = row.Scan(
 		&media.ID,
 		&media.UploaderID,
+		&media.CreatedAt,
 		&media.MediaType,
 		&media.OriginalFilename,
 		&media.StoragePath,

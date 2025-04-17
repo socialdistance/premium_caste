@@ -3,11 +3,13 @@ package services_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"mime/multipart"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"premium_caste/internal/domain/models"
 	services "premium_caste/internal/services/media_service"
@@ -20,6 +22,14 @@ import (
 
 type MockMediaRepository struct {
 	mock.Mock
+}
+
+func (m *MockMediaRepository) GetMediaByGroupID(ctx context.Context, groupID uuid.UUID) ([]models.Media, error) {
+	args := m.Called(ctx, groupID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.Media), args.Error(1)
 }
 
 func (m *MockMediaRepository) AddMediaGroup(ctx context.Context, ownerID uuid.UUID, description string) error {
@@ -241,5 +251,60 @@ func TestAttachMedia(t *testing.T) {
 
 		assert.ErrorContains(t, err, "ownerID is required")
 		mockRepo.AssertNotCalled(t, "AddMediaGroup")
+	})
+}
+
+func TestMediaService_ListGroupMedia(t *testing.T) {
+	mockRepo := new(MockMediaRepository)
+	storageMock := new(MockFileStorage)
+
+	testGroupID := uuid.MustParse("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")
+	testMedia := []models.Media{
+		{
+			ID:               uuid.MustParse("b0d4a3c2-1a2b-4e3f-9c8d-7e6f5a4b3c2d"),
+			UploaderID:       uuid.MustParse("a1b2c3d4-e5f6-7890-1234-567890abcdef"),
+			CreatedAt:        time.Date(2025, 4, 17, 0, 0, 0, 0, time.UTC),
+			MediaType:        "image",
+			OriginalFilename: "nature.jpg",
+			StoragePath:      "uploads/images/b0d4a3c2/nature.jpg",
+			FileSize:         2 * 1024 * 1024, // 2MB
+			MimeType:         "image/jpeg",
+			IsPublic:         true,
+			Metadata:         models.Metadata{"location": "Paris", "camera": "Canon EOS R5"},
+		},
+		{
+			ID:               uuid.MustParse("a1b2c3d4-e5f6-7890-1234-567890abcdef"),
+			UploaderID:       uuid.MustParse("b0d4a3c2-1a2b-4e3f-9c8d-7e6f5a4b3c2d"),
+			CreatedAt:        time.Date(2025, 4, 17, 0, 0, 0, 0, time.UTC),
+			MediaType:        "image",
+			OriginalFilename: "nature1.jpg",
+			StoragePath:      "uploads/images/b0d4a3c2/nature1.jpg",
+			FileSize:         2 * 1024 * 1024, // 2MB
+			MimeType:         "image/jpeg",
+			IsPublic:         true,
+			Metadata:         models.Metadata{"location": "Paris", "camera": "Canon EOS R5"},
+		},
+	}
+
+	log := slog.Default()
+
+	service := services.NewMediaService(log, mockRepo, storageMock)
+
+	t.Run("Succesfull get media by group id", func(t *testing.T) {
+		mockRepo.On("GetMediaByGroupID", mock.Anything, testGroupID).Return(testMedia, nil)
+
+		result, err := service.ListGroupMedia(context.Background(), testGroupID)
+		fmt.Println(result)
+
+		assert.NoError(t, err)
+		assert.Equal(t, testMedia, result)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("validation error, empty groupID", func(t *testing.T) {
+		_, err := service.ListGroupMedia(context.Background(), uuid.Nil)
+
+		assert.ErrorContains(t, err, "groupID is required")
+		mockRepo.AssertNotCalled(t, "GetMediaByGroupID")
 	})
 }
