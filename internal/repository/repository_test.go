@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -19,7 +20,6 @@ var (
 	testCtx = context.Background()
 )
 
-// Запуск PostgreSQL в контейнере
 func setupTestDB(t *testing.T) *pgxpool.Pool {
 	ctx := context.Background()
 
@@ -97,6 +97,17 @@ func applyMigrations(pool *pgxpool.Pool) error {
 			position INT NOT NULL,
 			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 			PRIMARY KEY (group_id, media_id)
+		);
+
+		CREATE TABLE IF NOT EXISTS users (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			name TEXT NOT NULL,
+			email TEXT UNIQUE NOT NULL,
+			phone TEXT,
+			password TEXT NOT NULL,
+			permission_id INTEGER,
+			basket_id UUID,
+			last_login TIMESTAMP WITH TIME ZONE
 		);
 	`)
 	return err
@@ -343,4 +354,94 @@ func TestMediaRepo_TransactionHandling(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 0, count)
 	})
+}
+
+func TestUserRepository_SaveUser(t *testing.T) {
+	pool := setupTestDB(t)
+
+	repo := repository.NewUserRepository(pool)
+
+	t.Run("successful user creation", func(t *testing.T) {
+		user := models.User{
+			Name:         "Test User",
+			Email:        "test@example.com",
+			Phone:        "+1234567890",
+			Password:     []byte("securepassword"),
+			PermissionID: 1,
+			BasketID:     uuid.New(),
+		}
+
+		id, err := repo.SaveUser(testCtx, user)
+		require.NoError(t, err)
+		assert.NotEqual(t, uuid.Nil, id)
+
+		var count int
+		err = pool.QueryRow(testCtx, "SELECT COUNT(*) FROM users WHERE email = $1", user.Email).Scan(&count)
+		require.NoError(t, err)
+		assert.Equal(t, 1, count)
+	})
+
+	t.Run("duplicate email", func(t *testing.T) {
+		user := models.User{
+			Name:     "Duplicate User",
+			Email:    "duplicate@example.com",
+			Password: []byte("password"),
+		}
+
+		_, err := repo.SaveUser(testCtx, user)
+		require.NoError(t, err)
+
+		_, err = repo.SaveUser(testCtx, user)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "duplicate key value violates unique constraint")
+	})
+}
+
+func TestUserRepository_User(t *testing.T) {
+	pool := setupTestDB(t)
+
+	repo := repository.NewUserRepository(pool)
+
+	testUser := models.User{
+		ID:           uuid.New(),
+		Name:         "Existing User",
+		Email:        "existing@example.com",
+		Password:     []byte("hashedpassword"),
+		PermissionID: 2,
+		BasketID:     uuid.New(),
+	}
+
+	_, err := pool.Exec(testCtx,
+		"INSERT INTO users (id, name, email, password, permission_id, basket_id) VALUES ($1, $2, $3, $4, $5, $6)",
+		testUser.ID, testUser.Name, testUser.Email, testUser.Password, testUser.PermissionID, testUser.BasketID,
+	)
+	require.NoError(t, err)
+
+	t.Run("existing user", func(t *testing.T) {
+		user, err := repo.User(testCtx, testUser.Email)
+		require.NoError(t, err)
+
+		assert.Equal(t, testUser.ID, user.ID)
+		assert.Equal(t, testUser.Name, user.Name)
+		assert.Equal(t, testUser.Email, user.Email)
+		assert.Equal(t, testUser.Password, user.Password)
+		assert.Equal(t, testUser.PermissionID, user.PermissionID)
+		assert.Equal(t, testUser.BasketID, user.BasketID)
+	})
+
+	// t.Run("non-existent user", func(t *testing.T) {
+	// 	_, err := repo.User(testCtx, "nonexistent@example.com")
+	// 	require.Error(t, err)
+	// 	assert.ErrorIs(t, err, storage.ErrUserNotFound)
+	// })
+
+	// t.Run("empty email", func(t *testing.T) {
+	// 	_, err := repo.User(testCtx, "")
+	// 	require.Error(t, err)
+	// 	assert.ErrorIs(t, err, storage.ErrUserNotFound)
+	// })
+}
+
+func TestUserRepository_IsAdmin(t *testing.T) {
+	t.Skip("Test will be implemented after IsAdmin method completion")
 }

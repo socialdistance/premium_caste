@@ -61,7 +61,7 @@ func (r *UserRepo) SaveUser(ctx context.Context, user models.User) (uuid.UUID, e
 }
 
 func (r *UserRepo) User(ctx context.Context, email string) (models.User, error) {
-	sql, args, err := r.sb.Select("id", "name", "email", "password", "permission_id", "basket_id").From("users").Where(sq.Eq{"email": email}).PlaceholderFormat(sq.Dollar).ToSql()
+	sql, args, err := r.sb.Select("id", "name", "email", "password", "permission_id", "basket_id").From("users").Where(sq.Eq{"email": email}).ToSql()
 	if err != nil {
 		return models.User{}, fmt.Errorf("can't build sql:%w", err)
 	}
