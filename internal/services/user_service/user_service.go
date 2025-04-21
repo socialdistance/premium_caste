@@ -96,12 +96,12 @@ func (u *UserService) RegisterNewUser(ctx context.Context, input dto.UserRegiste
 	}
 
 	user := models.User{
-		Name:         input.Name,
-		Email:        input.Email,
-		Phone:        input.Phone,
-		Password:     passHash,
-		PermissionID: input.PermissionID,
-		BasketID:     uuid.New(),
+		Name:     input.Name,
+		Email:    input.Email,
+		Phone:    input.Phone,
+		Password: passHash,
+		IsAdmin:  input.IsAdmin,
+		BasketID: uuid.New(),
 	}
 
 	id, err := u.repo.SaveUser(ctx, user)
@@ -122,12 +122,12 @@ func (u *UserService) RegisterNewUser(ctx context.Context, input dto.UserRegiste
 	return id, nil
 }
 
-func (u *UserService) IsAdmin(ctx context.Context, userID int64) (bool, error) {
+func (u *UserService) IsAdmin(ctx context.Context, userID uuid.UUID) (bool, error) {
 	const op = "user_service.IsAdmin"
 
 	log := u.log.With(
 		slog.String("op", op),
-		slog.Int64("user_id", userID),
+		slog.Any("user_id", userID),
 	)
 
 	log.Info("checking if user is admin")

@@ -105,7 +105,7 @@ func applyMigrations(pool *pgxpool.Pool) error {
 			email TEXT UNIQUE NOT NULL,
 			phone TEXT,
 			password TEXT NOT NULL,
-			permission_id INTEGER,
+			is_admin BOOLEAN,
 			basket_id UUID,
 			last_login TIMESTAMP WITH TIME ZONE
 		);
@@ -363,12 +363,12 @@ func TestUserRepository_SaveUser(t *testing.T) {
 
 	t.Run("successful user creation", func(t *testing.T) {
 		user := models.User{
-			Name:         "Test User",
-			Email:        "test@example.com",
-			Phone:        "+1234567890",
-			Password:     []byte("securepassword"),
-			PermissionID: 1,
-			BasketID:     uuid.New(),
+			Name:     "Test User",
+			Email:    "test@example.com",
+			Phone:    "+1234567890",
+			Password: []byte("securepassword"),
+			IsAdmin:  false,
+			BasketID: uuid.New(),
 		}
 
 		id, err := repo.SaveUser(testCtx, user)
@@ -403,17 +403,17 @@ func TestUserRepository_User(t *testing.T) {
 	repo := repository.NewUserRepository(pool)
 
 	testUser := models.User{
-		ID:           uuid.New(),
-		Name:         "Existing User",
-		Email:        "existing@example.com",
-		Password:     []byte("hashedpassword"),
-		PermissionID: 2,
-		BasketID:     uuid.New(),
+		ID:       uuid.New(),
+		Name:     "Existing User",
+		Email:    "existing@example.com",
+		Password: []byte("hashedpassword"),
+		IsAdmin:  false,
+		BasketID: uuid.New(),
 	}
 
 	_, err := pool.Exec(testCtx,
-		"INSERT INTO users (id, name, email, password, permission_id, basket_id) VALUES ($1, $2, $3, $4, $5, $6)",
-		testUser.ID, testUser.Name, testUser.Email, testUser.Password, testUser.PermissionID, testUser.BasketID,
+		"INSERT INTO users (id, name, email, password, is_admin, basket_id) VALUES ($1, $2, $3, $4, $5, $6)",
+		testUser.ID, testUser.Name, testUser.Email, testUser.Password, testUser.IsAdmin, testUser.BasketID,
 	)
 	require.NoError(t, err)
 
@@ -425,7 +425,7 @@ func TestUserRepository_User(t *testing.T) {
 		assert.Equal(t, testUser.Name, user.Name)
 		assert.Equal(t, testUser.Email, user.Email)
 		assert.Equal(t, testUser.Password, user.Password)
-		assert.Equal(t, testUser.PermissionID, user.PermissionID)
+		assert.Equal(t, testUser.IsAdmin, user.IsAdmin)
 		assert.Equal(t, testUser.BasketID, user.BasketID)
 	})
 
@@ -443,5 +443,47 @@ func TestUserRepository_User(t *testing.T) {
 }
 
 func TestUserRepository_IsAdmin(t *testing.T) {
-	t.Skip("Test will be implemented after IsAdmin method completion")
+	pool := setupTestDB(t)
+
+	repo := repository.NewUserRepository(pool)
+
+	testUser := []models.User{
+		{
+			ID:       uuid.New(),
+			Name:     "IsAdmin User",
+			Email:    "admin@example.com",
+			Password: []byte("hashedpassword"),
+			IsAdmin:  true,
+			BasketID: uuid.New(),
+		},
+		{
+			ID:       uuid.New(),
+			Name:     "Not admin User",
+			Email:    "not_admin@example.com",
+			Password: []byte("hashedpassword"),
+			IsAdmin:  false,
+			BasketID: uuid.New(),
+		},
+	}
+
+	_, err := pool.Exec(testCtx,
+		"INSERT INTO users (id, name, email, password, is_admin, basket_id) VALUES ($1, $2, $3, $4, $5, $6), ($7, $8, $9, $10, $11, $12)",
+		testUser[0].ID, testUser[0].Name, testUser[0].Email, testUser[0].Password, testUser[0].IsAdmin, testUser[0].BasketID,
+		testUser[1].ID, testUser[1].Name, testUser[1].Email, testUser[1].Password, testUser[1].IsAdmin, testUser[1].BasketID,
+	)
+	require.NoError(t, err)
+
+	t.Run("user is admin", func(t *testing.T) {
+		isAdmin, err := repo.IsAdmin(testCtx, testUser[0].ID)
+		require.NoError(t, err)
+
+		assert.Equal(t, testUser[0].IsAdmin, isAdmin)
+	})
+
+	t.Run("user is not admin", func(t *testing.T) {
+		isAdmin, err := repo.IsAdmin(testCtx, testUser[1].ID)
+		require.NoError(t, err)
+
+		assert.Equal(t, testUser[1].IsAdmin, isAdmin)
+	})
 }

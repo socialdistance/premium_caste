@@ -21,33 +21,23 @@ func main() {
 
 	log := setupLogger(cfg.Env)
 
-	_ = app.New(log, cfg.DSN, cfg.HTTP.Host, cfg.HTTP.Port, cfg.TokenTTL)
+	application := app.New(log, cfg.DSN, cfg.HTTP.Host, cfg.HTTP.Port, cfg.TokenTTL, cfg.FileStorage.BaseDir, cfg.FileStorage.BaseURL)
 
-	// go func() {
-	// 	application.GRPCServer.MustRun()
-	// }()
-
-	// go func() {
-	// 	application.HTTPServer.BuildRouters()
-	// 	application.HTTPServer.MustRun()
-	// }()
-
-	// go func() {
-	// 	application.FileService.FileRun()
-	// }()
+	go func() {
+		application.HTTPServer.BuildRouters()
+		application.HTTPServer.MustRun()
+	}()
 
 	// Graceful shutdown
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
 
 	<-stop
-	// application.GRPCServer.Stop()
-	// application.HTTPServer.Stop()
-	// application.FileService.Stop()
-	// application.Watcher.Close()
+	application.HTTPServer.Stop()
+	application.Repo.Close()
 
-	// log.Info("Gracefully stopped")
-	// log.Info("application stop")
+	log.Info("Gracefully stopped")
+	log.Info("application stop")
 }
 
 func setupLogger(env string) *slog.Logger {

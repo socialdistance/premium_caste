@@ -10,7 +10,7 @@ import (
 
 type UserRepository interface {
 	SaveUser(ctx context.Context, user models.User) (uuid.UUID, error)
-	IsAdmin(ctx context.Context, userID int64) (bool, error)
+	IsAdmin(ctx context.Context, userID uuid.UUID) (bool, error)
 	User(ctx context.Context, email string) (models.User, error)
 }
 

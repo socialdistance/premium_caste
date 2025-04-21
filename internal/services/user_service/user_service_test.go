@@ -33,7 +33,7 @@ func (m *MockUserRepository) User(ctx context.Context, email string) (models.Use
 	return args.Get(0).(models.User), args.Error(1)
 }
 
-func (m *MockUserRepository) IsAdmin(ctx context.Context, userID int64) (bool, error) {
+func (m *MockUserRepository) IsAdmin(ctx context.Context, userID uuid.UUID) (bool, error) {
 	args := m.Called(ctx, userID)
 	return args.Bool(0), args.Error(1)
 }
@@ -101,11 +101,11 @@ func TestUserService_RegisterNewUser(t *testing.T) {
 
 	// Тестовые данные
 	testInput := dto.UserRegisterInput{
-		Name:         "Test User",
-		Email:        "test@example.com",
-		Phone:        "+1234567890",
-		Password:     "password123",
-		PermissionID: 1,
+		Name:     "Test User",
+		Email:    "test@example.com",
+		Phone:    "+1234567890",
+		Password: "password123",
+		IsAdmin:  false,
 	}
 
 	t.Run("successful registration", func(t *testing.T) {
@@ -150,7 +150,7 @@ func TestUserService_IsAdmin(t *testing.T) {
 	log := slog.Default()
 	service := services.NewUserService(log, mockRepo, 1*time.Hour)
 
-	testUserID := int64(1)
+	testUserID := uuid.New()
 
 	t.Run("user is admin", func(t *testing.T) {
 		mockRepo.On("IsAdmin", ctx, testUserID).Return(true, nil).Once()

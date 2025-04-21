@@ -10,6 +10,9 @@ import (
 	httprouters "premium_caste/internal/transport/http"
 
 	"github.com/arl/statsviz"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	echojwt "github.com/labstack/echo-jwt"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -106,20 +109,57 @@ func (s *Server) Stop() error {
 	return nil
 }
 
-func (s *Server) BuildRouters() {
-	// fs := http.FileServer(http.Dir(s.filePaths))
-	// s.e.GET("/uploads/*", echo.WrapHandler(http.StripPrefix("/uploads/", fs)))
+func (s *Server) jwtMiddleware() echo.MiddlewareFunc {
+	return echojwt.WithConfig(echojwt.Config{
+		SigningKey:  []byte("your-secret-key"), // Замените на реальный ключ из конфига
+		TokenLookup: "header:Authorization",
+	})
+}
 
+func (s *Server) adminOnlyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		token := jwt.New(jwt.SigningMethodHS256)
+
+		claims := token.Claims.(jwt.MapClaims)
+
+		userID, err := uuid.Parse(claims["sub"].(string))
+		if err != nil {
+			return echo.NewHTTPError(http.StatusUnauthorized, "invalid token")
+		}
+
+		isAdmin, err := s.routers.UserService.IsAdmin(c.Request().Context(), userID)
+		if err != nil || !isAdmin {
+			return echo.NewHTTPError(http.StatusForbidden, "admin access required")
+		}
+
+		return next(c)
+	}
+}
+
+func (s *Server) BuildRouters() {
+	// Debug endpoints
 	debug := s.e.Group("/debug")
 	debug.GET("/statsviz/", echo.WrapHandler(s.m))
 	debug.GET("/statsviz/*", echo.WrapHandler(s.m))
 
-	_ = s.e.Group("/api")
+	// API v1 routes
+	api := s.e.Group("/api/v1")
+	{
+		userGroup := api.Group("/users")
+		{
+			// userGroup.POST("", s.routers.CreateUser)
+			userGroup.POST("/login", s.routers.Login)
+			// userGroup.GET("/:email", s.routers.GetUserByEmail, s.adminOnlyMiddleware)
+		}
 
-	// api.POST("/personscreate", s.routers.PersonsByCreateByAdmin)
-	// api.POST("/personsrecovery", s.routers.PersonsByRecoveryByAdmin)
-	// api.POST("/searchcreate", s.routers.SearchByCreate)
-	// api.POST("/searchrecovery", s.routers.SearchByRecovery)
-	// api.PATCH("/update", s.routers.UpdateField)
-	// api.POST("/upload", s.routers.HandlerUpload)
+		// mediaGroup := api.Group("/media", s.jwtMiddleware())
+		// {
+		// 	mediaGroup.POST("", s.routers.CreateMedia)
+		// 	mediaGroup.PUT("/:id", s.routers.UpdateMedia)
+		// 	mediaGroup.GET("/:id", s.routers.GetMediaByID)
+		// 	mediaGroup.POST("/groups", s.routers.CreateMediaGroup)
+		// 	mediaGroup.POST("/groups/:groupID/items", s.routers.AddMediaToGroup)
+		// 	mediaGroup.GET("/groups/:groupID", s.routers.GetMediaByGroupID)
+		// }
+	}
 }
