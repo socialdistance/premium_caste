@@ -106,7 +106,7 @@ func (u *UserService) RegisterNewUser(ctx context.Context, input dto.UserRegiste
 
 	id, err := u.repo.SaveUser(ctx, user)
 	if err != nil {
-		if errors.Is(err, storage.ErrUserExists) {
+		if errors.Is(err, ErrUserExist) {
 			log.Warn("user already exist", slog.Any("error", err.Error()))
 
 			return uuid.Nil, fmt.Errorf("%s: %w", op, ErrUserExist)

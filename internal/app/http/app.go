@@ -10,12 +10,21 @@ import (
 	httprouters "premium_caste/internal/transport/http"
 
 	"github.com/arl/statsviz"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	echojwt "github.com/labstack/echo-jwt"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	echoSwagger "github.com/swaggo/echo-swagger"
 )
+
+type CustomValidator struct {
+	validator *validator.Validate
+}
+
+func (cv *CustomValidator) Validate(i interface{}) error {
+	return cv.validator.Struct(i)
+}
 
 type Server struct {
 	m       *http.ServeMux
@@ -30,6 +39,9 @@ func New(log *slog.Logger, token string, host, port string, routers *httprouters
 	e := echo.New()
 	e.HideBanner = true
 
+	validate := validator.New()
+	e.Validator = &CustomValidator{validator: validate}
+
 	// e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 	//     AllowOrigins: []string{"*"},
 	//     AllowMethods: []string{echo.GET, echo.PUT, echo.POST, echo.DELETE},
@@ -39,7 +51,7 @@ func New(log *slog.Logger, token string, host, port string, routers *httprouters
 	e.Use(middleware.Recover())
 
 	// e.Use(echojwt.WithConfig(echojwt.Config{
-	// SigningKey: []byte(token),
+	// 	SigningKey: []byte(token),
 	// }))
 
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
@@ -73,7 +85,6 @@ func New(log *slog.Logger, token string, host, port string, routers *httprouters
 	}
 }
 
-// MustRun runs HTTP server and panics if any error occurs.
 func (s *Server) MustRun() {
 	const op = "http.Server.MustRun"
 
@@ -111,25 +122,28 @@ func (s *Server) Stop() error {
 
 func (s *Server) jwtMiddleware() echo.MiddlewareFunc {
 	return echojwt.WithConfig(echojwt.Config{
-		SigningKey:  []byte("your-secret-key"), // Замените на реальный ключ из конфига
+		SigningKey:  []byte("your-secret-key"),
 		TokenLookup: "header:Authorization",
 	})
 }
 
 func (s *Server) adminOnlyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		token := jwt.New(jwt.SigningMethodHS256)
-
-		claims := token.Claims.(jwt.MapClaims)
-
-		userID, err := uuid.Parse(claims["sub"].(string))
-		if err != nil {
-			return echo.NewHTTPError(http.StatusUnauthorized, "invalid token")
+		userID, ok := c.Get("user").(string)
+		fmt.Println(userID)
+		fmt.Println(ok)
+		if !ok || userID == "" {
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "authentication required"})
 		}
 
-		isAdmin, err := s.routers.UserService.IsAdmin(c.Request().Context(), userID)
+		parsedUUID, err := uuid.Parse(userID)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid user ID format"})
+		}
+
+		isAdmin, err := s.routers.UserService.IsAdmin(c.Request().Context(), parsedUUID)
 		if err != nil || !isAdmin {
-			return echo.NewHTTPError(http.StatusForbidden, "admin access required")
+			return c.JSON(http.StatusForbidden, map[string]string{"error": "admin access required"})
 		}
 
 		return next(c)
@@ -137,7 +151,8 @@ func (s *Server) adminOnlyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 func (s *Server) BuildRouters() {
-	// Debug endpoints
+	s.e.GET("/swagger/*", echoSwagger.WrapHandler)
+
 	debug := s.e.Group("/debug")
 	debug.GET("/statsviz/", echo.WrapHandler(s.m))
 	debug.GET("/statsviz/*", echo.WrapHandler(s.m))
@@ -147,8 +162,9 @@ func (s *Server) BuildRouters() {
 	{
 		userGroup := api.Group("/users")
 		{
-			// userGroup.POST("", s.routers.CreateUser)
+			userGroup.POST("/register", s.routers.Register)
 			userGroup.POST("/login", s.routers.Login)
+			userGroup.GET("/:user_id/is-admin", s.routers.IsAdminPermission)
 			// userGroup.GET("/:email", s.routers.GetUserByEmail, s.adminOnlyMiddleware)
 		}
 
