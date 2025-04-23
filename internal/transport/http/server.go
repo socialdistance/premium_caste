@@ -39,6 +39,11 @@ type Routers struct {
 	MediaService MediaService
 }
 
+// ServeHTTP implements http.Handler.
+func (r *Routers) ServeHTTP(http.ResponseWriter, *http.Request) {
+	panic("unimplemented")
+}
+
 func NewRouter(log *slog.Logger, userService UserService, mediaService MediaService) *Routers {
 	return &Routers{
 		log:          log,
