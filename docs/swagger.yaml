@@ -22,6 +22,50 @@ definitions:
     - password
     - phone
     type: object
+  models.Media:
+    properties:
+      created_at:
+        type: string
+      duration:
+        type: integer
+      file_size:
+        type: integer
+      height:
+        type: integer
+      id:
+        type: string
+      is_public:
+        type: boolean
+      media_type:
+        $ref: '#/definitions/models.MediaType'
+      metadata:
+        $ref: '#/definitions/models.Metadata'
+      mime_type:
+        type: string
+      original_filename:
+        type: string
+      storage_path:
+        type: string
+      uploader_id:
+        type: string
+      width:
+        type: integer
+    type: object
+  models.MediaType:
+    enum:
+    - photo
+    - video
+    - audio
+    - document
+    type: string
+    x-enum-varnames:
+    - MediaTypePhoto
+    - MediaTypeVideo
+    - MediaTypeAudio
+    - MediaTypeDocument
+  models.Metadata:
+    additionalProperties: true
+    type: object
   request.LoginRequest:
     properties:
       email:
@@ -53,45 +97,7 @@ definitions:
 info:
   contact: {}
 paths:
-  /api/v1/users/{user_id}/is-admin:
-    get:
-      consumes:
-      - application/json
-      description: Проверяет, является ли указанный пользователь администратором
-      parameters:
-      - description: UUID пользователя
-        format: uuid
-        in: path
-        name: user_id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 'Результат проверки" example({"is_admin": true})'
-          schema:
-            additionalProperties:
-              type: boolean
-            type: object
-        "400":
-          description: 'Невалидный UUID" example({"error": "invalid user ID format"})'
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: 'Ошибка сервера" example({"error": "failed to check admin status"})'
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - ApiKeyAuth: []
-      summary: Проверка административного статуса пользователя
-      tags:
-      - Users
-  /auth/login:
+  /api/v1/login:
     post:
       consumes:
       - application/json
@@ -127,8 +133,185 @@ paths:
             $ref: '#/definitions/response.ErrorResponse'
       summary: Аутентификация пользователя
       tags:
-      - auth
-  /auth/register:
+      - users
+  /api/v1/media/groups:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Создает новую группу для организации медиафайлов
+      parameters:
+      - description: UUID владельца группы
+        format: uuid
+        in: formData
+        name: owner_id
+        required: true
+        type: string
+      - description: Описание группы
+        in: formData
+        name: description
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Группа создана (no content)
+        "400":
+          description: Невалидный UUID владельца
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Ошибка создания группы
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Создать медиагруппу
+      tags:
+      - Медиа-группы
+  /api/v1/media/groups/{group_id}:
+    get:
+      description: Возвращает список всех медиафайлов в группе
+      parameters:
+      - description: UUID группы
+        format: uuid
+        in: path
+        name: group_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список медиафайлов
+          schema:
+            items:
+              $ref: '#/definitions/models.Media'
+            type: array
+        "400":
+          description: Невалидный UUID группы
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Ошибка получения списка
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Получить медиа группы
+      tags:
+      - Медиа-группы
+  /api/v1/media/groups/{group_id}/attach:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Связывает медиафайл с существующей медиагруппой
+      parameters:
+      - description: UUID группы
+        format: uuid
+        in: path
+        name: group_id
+        required: true
+        type: string
+      - description: UUID медиафайла
+        format: uuid
+        in: formData
+        name: media_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное прикрепление (no content)
+        "400":
+          description: Невалидные UUID группы или медиа
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Ошибка привязки медиа
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Прикрепить медиа к группе
+      tags:
+      - Медиа-группы
+  /api/v1/media/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Загружает файл на сервер с возможностью указания метаданных
+      parameters:
+      - description: Файл для загрузки (макс. 10MB)
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: UUID пользователя-загрузчика
+        format: uuid
+        in: formData
+        name: uploader_id
+        required: true
+        type: string
+      - description: Тип контента
+        enum:
+        - photo
+        - video
+        - audio
+        - document
+        in: formData
+        name: media_type
+        required: true
+        type: string
+      - description: Публичный доступ (по умолчанию false)
+        in: formData
+        name: is_public
+        type: boolean
+      - description: Дополнительные метаданные в JSON-формате
+        in: formData
+        name: metadata
+        type: string
+      - description: Ширина в пикселях (для изображений/видео)
+        in: formData
+        name: width
+        type: integer
+      - description: Высота в пикселях (для изображений/видео)
+        in: formData
+        name: height
+        type: integer
+      - description: Длительность в секундах (для видео/аудио)
+        in: formData
+        name: duration
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Успешно загруженный медиаобъект
+          schema:
+            $ref: '#/definitions/models.Media'
+        "400":
+          description: Некорректные входные данные
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "413":
+          description: Превышен максимальный размер файла
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "415":
+          description: Неподдерживаемый тип файла
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Загрузка медиафайла
+      tags:
+      - Медиа
+  /api/v1/register:
     post:
       consumes:
       - application/json
@@ -169,5 +352,43 @@ paths:
             $ref: '#/definitions/response.ErrorResponse'
       summary: Регистрация нового пользователя
       tags:
-      - auth
+      - users
+  /api/v1/users/{user_id}/is-admin:
+    get:
+      consumes:
+      - application/json
+      description: Проверяет, является ли указанный пользователь администратором
+      parameters:
+      - description: UUID пользователя
+        format: uuid
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'Результат проверки" example({"is_admin": true})'
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "400":
+          description: 'Невалидный UUID" example({"error": "invalid user ID format"})'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 'Ошибка сервера" example({"error": "failed to check admin status"})'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Проверка административного статуса пользователя
+      tags:
+      - Users
 swagger: "2.0"

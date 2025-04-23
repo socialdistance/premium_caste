@@ -33,6 +33,7 @@ type Server struct {
 	routers *httprouters.Routers
 	host    string
 	port    string
+	token   string
 }
 
 func New(log *slog.Logger, token string, host, port string, routers *httprouters.Routers) *Server {
@@ -82,6 +83,7 @@ func New(log *slog.Logger, token string, host, port string, routers *httprouters
 		routers: routers,
 		host:    host,
 		port:    port,
+		token:   token,
 	}
 }
 
@@ -120,12 +122,12 @@ func (s *Server) Stop() error {
 	return nil
 }
 
-func (s *Server) jwtMiddleware() echo.MiddlewareFunc {
-	return echojwt.WithConfig(echojwt.Config{
-		SigningKey:  []byte("your-secret-key"),
-		TokenLookup: "header:Authorization",
-	})
-}
+// func (s *Server) jwtMiddleware() echo.MiddlewareFunc {
+// 	return echojwt.WithConfig(echojwt.Config{
+// 		SigningKey:  []byte(s.token),
+// 		TokenLookup: "header:Authorization",
+// 	})
+// }
 
 func (s *Server) adminOnlyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -151,31 +153,38 @@ func (s *Server) adminOnlyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 func (s *Server) BuildRouters() {
-	s.e.GET("/swagger/*", echoSwagger.WrapHandler)
-
-	debug := s.e.Group("/debug")
-	debug.GET("/statsviz/", echo.WrapHandler(s.m))
-	debug.GET("/statsviz/*", echo.WrapHandler(s.m))
-
 	// API v1 routes
 	api := s.e.Group("/api/v1")
 	{
-		userGroup := api.Group("/users")
+		api.POST("/register", s.routers.Register)
+		api.POST("/login", s.routers.Login)
+
+		debug := s.e.Group("/debug")
 		{
-			userGroup.POST("/register", s.routers.Register)
-			userGroup.POST("/login", s.routers.Login)
+			debug.GET("/statsviz/", echo.WrapHandler(s.m))
+			debug.GET("/statsviz/*", echo.WrapHandler(s.m))
+		}
+
+		swagger := s.e.Group("/swag")
+		{
+			swagger.GET("/swagger/*", echoSwagger.WrapHandler)
+		}
+
+		userGroup := api.Group("/users")
+		userGroup.Use(echojwt.WithConfig(echojwt.Config{
+			SigningKey: []byte(s.token),
+		}))
+		{
 			userGroup.GET("/:user_id/is-admin", s.routers.IsAdminPermission)
 			// userGroup.GET("/:email", s.routers.GetUserByEmail, s.adminOnlyMiddleware)
 		}
 
-		// mediaGroup := api.Group("/media", s.jwtMiddleware())
-		// {
-		// 	mediaGroup.POST("", s.routers.CreateMedia)
-		// 	mediaGroup.PUT("/:id", s.routers.UpdateMedia)
-		// 	mediaGroup.GET("/:id", s.routers.GetMediaByID)
-		// 	mediaGroup.POST("/groups", s.routers.CreateMediaGroup)
-		// 	mediaGroup.POST("/groups/:groupID/items", s.routers.AddMediaToGroup)
-		// 	mediaGroup.GET("/groups/:groupID", s.routers.GetMediaByGroupID)
-		// }
+		mediaGroup := api.Group("/media" /* s.jwtMiddleware() */)
+		{
+			mediaGroup.POST("/upload", s.routers.UploadMedia)
+			mediaGroup.POST("/groups/:group_id/attach", s.routers.AttachMediaToGroup)
+			mediaGroup.POST("/groups", s.routers.CreateMediaGroup)
+			mediaGroup.GET("/groups/:group_id", s.routers.ListGroupMedia)
+		}
 	}
 }

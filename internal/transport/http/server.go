@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -10,6 +11,8 @@ import (
 	"premium_caste/internal/transport/http/dto"
 	"premium_caste/internal/transport/http/dto/request"
 	"premium_caste/internal/transport/http/dto/response"
+	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -33,14 +36,14 @@ type MediaService interface {
 type Routers struct {
 	log          *slog.Logger
 	UserService  UserService
-	mediaService MediaService
+	MediaService MediaService
 }
 
 func NewRouter(log *slog.Logger, userService UserService, mediaService MediaService) *Routers {
 	return &Routers{
 		log:          log,
 		UserService:  userService,
-		mediaService: mediaService,
+		MediaService: mediaService,
 	}
 }
 
@@ -54,14 +57,14 @@ var (
 // Login godoc
 // @Summary Аутентификация пользователя
 // @Description Вход в систему по email и паролю. Возвращает JWT-токен.
-// @Tags auth
+// @Tags users
 // @Accept json
 // @Produce json
 // @Param request body request.LoginRequest true "Данные для входа"
 // @Success 200 {object} response.Response{data=map[string]string} "Успешный вход (токен)"
 // @Failure 400 {object} response.ErrorResponse "Неверный формат запроса"
 // @Failure 401 {object} response.ErrorResponse "Ошибка аутентификации"
-// @Router /auth/login [post]
+// @Router /api/v1/login [post]
 func (r *Routers) Login(c echo.Context) error {
 	const op = "http.routers.auth.Login"
 
@@ -96,7 +99,7 @@ func (r *Routers) Login(c echo.Context) error {
 // Register godoc
 // @Summary Регистрация нового пользователя
 // @Description Создание аккаунта. Возвращает ID пользователя.
-// @Tags auth
+// @Tags users
 // @Accept json
 // @Produce json
 // @Param request body dto.UserRegisterInput true "Данные для регистрации"
@@ -104,7 +107,7 @@ func (r *Routers) Login(c echo.Context) error {
 // @Failure 400 {object} response.ErrorResponse "Неверный формат запроса"
 // @Failure 409 {object} response.ErrorResponse "Пользователь уже существует"
 // @Failure 500 {object} response.ErrorResponse "Внутренняя ошибка сервера"
-// @Router /auth/register [post]
+// @Router /api/v1/register [post]
 func (r *Routers) Register(c echo.Context) error {
 	const op = "http.routers.auth.Register"
 
@@ -172,7 +175,6 @@ func (r *Routers) IsAdminPermission(c echo.Context) error {
 		})
 	}
 
-	// Вызываем сервисный метод
 	isAdmin, err := r.UserService.IsAdmin(c.Request().Context(), userID)
 	if err != nil {
 		r.log.Error("failed to check admin status",
@@ -187,4 +189,205 @@ func (r *Routers) IsAdminPermission(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]bool{
 		"is_admin": isAdmin,
 	})
+}
+
+// UploadMedia godoc
+// @Summary Загрузка медиафайла
+// @Description Загружает файл на сервер с возможностью указания метаданных
+// @Tags Медиа
+// @Accept multipart/form-data
+// @Produce json
+// @Param file formData file true "Файл для загрузки (макс. 10MB)"
+// @Param uploader_id formData string true "UUID пользователя-загрузчика" format(uuid)
+// @Param media_type formData string true "Тип контента" Enums(photo, video, audio, document)
+// @Param is_public formData boolean false "Публичный доступ (по умолчанию false)"
+// @Param metadata formData string false "Дополнительные метаданные в JSON-формате"
+// @Param width formData integer false "Ширина в пикселях (для изображений/видео)"
+// @Param height formData integer false "Высота в пикселях (для изображений/видео)"
+// @Param duration formData integer false "Длительность в секундах (для видео/аудио)"
+// @Success 201 {object} models.Media "Успешно загруженный медиаобъект"
+// @Failure 400 {object} response.ErrorResponse "Некорректные входные данные"
+// @Failure 413 {object} response.ErrorResponse "Превышен максимальный размер файла"
+// @Failure 415 {object} response.ErrorResponse "Неподдерживаемый тип файла"
+// @Failure 500 {object} response.ErrorResponse "Внутренняя ошибка сервера"
+// @Security ApiKeyAuth
+// @Router /api/v1/media/upload [post]
+func (r *Routers) UploadMedia(c echo.Context) error {
+	startTime := time.Now()
+	defer func() {
+		r.log.Info("Request completed",
+			"duration", time.Since(startTime))
+	}()
+
+	r.log.Info("Start uploading media",
+		"method", c.Request().Method,
+		"path", c.Path(),
+		"client_ip", c.RealIP())
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		r.log.Warn("Empty file in request",
+			"error", err.Error())
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "File is required"})
+	}
+
+	r.log.Debug("Got file for upload",
+		"filename", file.Filename,
+		"size", file.Size,
+		"mime_type", file.Header.Get("Content-Type"))
+
+	input, err := r.parseMediaUploadInput(c)
+	if err != nil {
+		r.log.Warn("Error parsing data",
+			"error", err.Error(),
+			"uploader_id", c.FormValue("uploader_id"))
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+	input.File = file
+
+	r.log.Debug("Options for upload",
+		"uploader_id", input.UploaderID,
+		"media_type", input.MediaType,
+		"is_public", input.IsPublic,
+		"metadata", input.CustomMetadata)
+
+	media, err := r.MediaService.UploadMedia(c.Request().Context(), *input)
+	if err != nil {
+		r.log.Error("Error upload media",
+			"error", err.Error(),
+			"uploader_id", input.UploaderID,
+			"filename", file.Filename)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	r.log.Info("Upload successfull",
+		"media_id", media.ID,
+		"uploader_id", media.UploaderID,
+		"file_size", media.FileSize,
+		"duration", time.Since(startTime))
+
+	return c.JSON(http.StatusCreated, media)
+}
+
+// AttachMediaToGroup godoc
+// @Summary Прикрепить медиа к группе
+// @Description Связывает медиафайл с существующей медиагруппой
+// @Tags Медиа-группы
+// @Accept multipart/form-data
+// @Produce json
+// @Param group_id path string true "UUID группы" format(uuid)
+// @Param media_id formData string true "UUID медиафайла" format(uuid)
+// @Success 200 "Успешное прикрепление (no content)"
+// @Failure 400 {object} response.ErrorResponse "Невалидные UUID группы или медиа"
+// @Failure 500 {object} response.ErrorResponse "Ошибка привязки медиа"
+// @Security ApiKeyAuth
+// @Router /api/v1/media/groups/{group_id}/attach [post]
+func (r *Routers) AttachMediaToGroup(c echo.Context) error {
+	groupID, err := uuid.Parse(c.Param("group_id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid group_id"})
+	}
+
+	mediaID, err := uuid.Parse(c.FormValue("media_id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid media_id"})
+	}
+
+	if err := r.MediaService.AttachMediaToGroup(c.Request().Context(), groupID, mediaID); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.NoContent(http.StatusOK)
+}
+
+// CreateMediaGroup godoc
+// @Summary Создать медиагруппу
+// @Description Создает новую группу для организации медиафайлов
+// @Tags Медиа-группы
+// @Accept multipart/form-data
+// @Produce json
+// @Param owner_id formData string true "UUID владельца группы" format(uuid)
+// @Param description formData string false "Описание группы"
+// @Success 201 "Группа создана (no content)"
+// @Failure 400 {object} response.ErrorResponse "Невалидный UUID владельца"
+// @Failure 500 {object} response.ErrorResponse "Ошибка создания группы"
+// @Security ApiKeyAuth
+// @Router /api/v1/media/groups [post]
+func (r *Routers) CreateMediaGroup(c echo.Context) error {
+	ownerID, err := uuid.Parse(c.FormValue("owner_id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid owner_id"})
+	}
+
+	description := c.FormValue("description")
+
+	if err := r.MediaService.AttachMedia(c.Request().Context(), ownerID, description); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.NoContent(http.StatusCreated)
+}
+
+// ListGroupMedia godoc
+// @Summary Получить медиа группы
+// @Description Возвращает список всех медиафайлов в группе
+// @Tags Медиа-группы
+// @Produce json
+// @Param group_id path string true "UUID группы" format(uuid)
+// @Success 200 {array} models.Media "Список медиафайлов"
+// @Failure 400 {object} response.ErrorResponse "Невалидный UUID группы"
+// @Failure 500 {object} response.ErrorResponse "Ошибка получения списка"
+// @Security ApiKeyAuth
+// @Router /api/v1/media/groups/{group_id} [get]
+func (r *Routers) ListGroupMedia(c echo.Context) error {
+	groupID, err := uuid.Parse(c.Param("group_id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid group_id"})
+	}
+
+	media, err := r.MediaService.ListGroupMedia(c.Request().Context(), groupID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, media)
+}
+
+func (r *Routers) parseMediaUploadInput(c echo.Context) (*dto.MediaUploadInput, error) {
+	uploaderID, err := uuid.Parse(c.FormValue("uploader_id"))
+	if err != nil {
+		return nil, err
+	}
+
+	var metadata map[string]any
+	if metaStr := c.FormValue("metadata"); metaStr != "" {
+		if err := json.Unmarshal([]byte(metaStr), &metadata); err != nil {
+			return nil, err
+		}
+	}
+
+	input := &dto.MediaUploadInput{
+		UploaderID:     uploaderID,
+		MediaType:      c.FormValue("media_type"),
+		IsPublic:       c.FormValue("is_public") == "true",
+		CustomMetadata: metadata,
+	}
+
+	if widthStr := c.FormValue("width"); widthStr != "" {
+		if width, err := strconv.Atoi(widthStr); err == nil {
+			input.Width = &width
+		}
+	}
+	if heightStr := c.FormValue("height"); heightStr != "" {
+		if height, err := strconv.Atoi(heightStr); err == nil {
+			input.Height = &height
+		}
+	}
+	if durationStr := c.FormValue("duration"); durationStr != "" {
+		if duration, err := strconv.Atoi(durationStr); err == nil {
+			input.Duration = &duration
+		}
+	}
+
+	return input, nil
 }

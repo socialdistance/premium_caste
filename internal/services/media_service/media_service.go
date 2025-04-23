@@ -41,7 +41,7 @@ func (s *MediaService) UploadMedia(ctx context.Context, input dto.MediaUploadInp
 
 	// log.Info("Upload media")
 
-	filePath, fileSize, err := s.fileStorage.Save(ctx, input.File, filepath.Join("user_uploads", input.UploaderID.String()))
+	filePath, fileSize, err := s.fileStorage.Save(ctx, input.File, filepath.Join("uploads", input.UploaderID.String()))
 	if err != nil {
 		log.Error("failed to save file", sl.Err(err))
 		return nil, fmt.Errorf("%s: %w", op, err)
