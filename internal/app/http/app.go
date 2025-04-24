@@ -182,9 +182,13 @@ func (s *Server) BuildRouters() {
 		mediaGroup := api.Group("/media" /* s.jwtMiddleware() */)
 		{
 			mediaGroup.POST("/upload", s.routers.UploadMedia)
-			mediaGroup.POST("/groups/:group_id/attach", s.routers.AttachMediaToGroup)
+			mediaGroup.POST("/groups/attach", s.routers.AttachMediaToGroup)
 			mediaGroup.POST("/groups", s.routers.CreateMediaGroup)
-			mediaGroup.GET("/groups/:group_id", s.routers.ListGroupMedia)
+			mediaGroup.GET("/groups/group_id", s.routers.ListGroupMedia)
 		}
 	}
+
+	//	e.POST("/login", authHandler.Login)
+	//
+	// e.POST("/refresh", authHandler.Refresh)
 }

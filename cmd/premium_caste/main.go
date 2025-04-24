@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -8,6 +9,7 @@ import (
 
 	"premium_caste/internal/app"
 	"premium_caste/internal/config"
+	redisapp "premium_caste/internal/storage/redis"
 )
 
 const (
@@ -21,7 +23,12 @@ func main() {
 
 	log := setupLogger(cfg.Env)
 
-	application := app.New(log, cfg.DSN, cfg.HTTP.Host, cfg.HTTP.Port, cfg.TokenTTL, cfg.FileStorage.BaseDir, cfg.FileStorage.BaseURL)
+	redisClient := redisapp.NewClient(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisDB)
+	if err := redisClient.Ping(context.Background()).Err(); err != nil {
+		panic("Failed to connect to Redis:")
+	}
+
+	application := app.New(log, redisClient, cfg.DSN, cfg.HTTP.Host, cfg.HTTP.Port, cfg.TokenTTL, cfg.FileStorage.BaseDir, cfg.FileStorage.BaseURL)
 
 	go func() {
 		application.HTTPServer.BuildRouters()
@@ -35,6 +42,7 @@ func main() {
 	<-stop
 	application.HTTPServer.Stop()
 	application.Repo.Close()
+	redisClient.Close()
 
 	log.Info("Gracefully stopped")
 	log.Info("application stop")

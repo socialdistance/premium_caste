@@ -19,8 +19,24 @@ type MediaUploadInput struct {
 	Duration *int `json:"duration,omitempty" validate:"omitempty,min=1"`
 
 	// Опциональные поля для изображений/видео
-	Width  *int `json:"width,omitempty" validate:"omitempty,min=1"`
-	Height *int `json:"height,omitempty" validate:"omitempty,min=1"`
+	Width  *int `json:"width,omitempty" validate:"required,min=1"`
+	Height *int `json:"height,omitempty" validate:"required,min=1"`
+}
+
+type CreateMediaGroupRequest struct {
+	OwnerID     string `json:"owner_id" validate:"required,uuid"`
+	Description string `json:"description"`
+}
+
+type AttachMediaRequest struct {
+	GroupID string `json:"group_id" validate:"required,uuid"`
+	MediaID string `json:"media_id" validate:"required,uuid"`
+}
+
+type ListGroupMediaRequest struct {
+	GroupID string `json:"group_id" validate:"required,uuid"`
+	Limit   int    `query:"limit" validate:"omitempty,min=1,max=100"`
+	Offset  int    `query:"offset" validate:"omitempty,min=0"`
 }
 
 // ToDomain преобразует DTO в доменную модель

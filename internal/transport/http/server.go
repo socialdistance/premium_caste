@@ -39,11 +39,6 @@ type Routers struct {
 	MediaService MediaService
 }
 
-// ServeHTTP implements http.Handler.
-func (r *Routers) ServeHTTP(http.ResponseWriter, *http.Request) {
-	panic("unimplemented")
-}
-
 func NewRouter(log *slog.Logger, userService UserService, mediaService MediaService) *Routers {
 	return &Routers{
 		log:          log,
@@ -288,18 +283,30 @@ func (r *Routers) UploadMedia(c echo.Context) error {
 // @Security ApiKeyAuth
 // @Router /api/v1/media/groups/{group_id}/attach [post]
 func (r *Routers) AttachMediaToGroup(c echo.Context) error {
-	groupID, err := uuid.Parse(c.Param("group_id"))
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid group_id"})
+	req := new(dto.AttachMediaRequest)
+	if err := c.Bind(req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid request data format",
+		})
 	}
 
-	mediaID, err := uuid.Parse(c.FormValue("media_id"))
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid media_id"})
+	if err := c.Validate(req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": err.Error(),
+		})
 	}
 
-	if err := r.MediaService.AttachMediaToGroup(c.Request().Context(), groupID, mediaID); err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	groupID, _ := uuid.Parse(req.GroupID)
+	mediaID, _ := uuid.Parse(req.MediaID)
+
+	if err := r.MediaService.AttachMediaToGroup(
+		c.Request().Context(),
+		groupID,
+		mediaID,
+	); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": err.Error(),
+		})
 	}
 
 	return c.NoContent(http.StatusOK)
@@ -319,15 +326,30 @@ func (r *Routers) AttachMediaToGroup(c echo.Context) error {
 // @Security ApiKeyAuth
 // @Router /api/v1/media/groups [post]
 func (r *Routers) CreateMediaGroup(c echo.Context) error {
-	ownerID, err := uuid.Parse(c.FormValue("owner_id"))
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid owner_id"})
+	req := new(dto.CreateMediaGroupRequest)
+
+	if err := c.Bind(req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid request data",
+		})
 	}
 
-	description := c.FormValue("description")
+	if err := c.Validate(req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": err.Error(),
+		})
+	}
 
-	if err := r.MediaService.AttachMedia(c.Request().Context(), ownerID, description); err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	ownerID, _ := uuid.Parse(req.OwnerID)
+
+	if err := r.MediaService.AttachMedia(
+		c.Request().Context(),
+		ownerID,
+		req.Description,
+	); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": err.Error(),
+		})
 	}
 
 	return c.NoContent(http.StatusCreated)
@@ -345,19 +367,39 @@ func (r *Routers) CreateMediaGroup(c echo.Context) error {
 // @Security ApiKeyAuth
 // @Router /api/v1/media/groups/{group_id} [get]
 func (r *Routers) ListGroupMedia(c echo.Context) error {
-	groupID, err := uuid.Parse(c.Param("group_id"))
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid group_id"})
+	req := new(dto.ListGroupMediaRequest)
+	if err := c.Bind(req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "Invalid query parameters",
+		})
 	}
+
+	if err := c.Validate(req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error":   "Validation failed",
+			"details": err.Error(),
+		})
+	}
+
+	groupID, _ := uuid.Parse(req.GroupID)
 
 	media, err := r.MediaService.ListGroupMedia(c.Request().Context(), groupID)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]string{
+			"error": err.Error(),
+		})
 	}
 
-	return c.JSON(http.StatusOK, media)
-}
+	response := map[string]interface{}{
+		"data": media,
+		"meta": map[string]interface{}{
+			"count":    len(media),
+			"group_id": groupID,
+		},
+	}
 
+	return c.JSON(http.StatusOK, response)
+}
 func (r *Routers) parseMediaUploadInput(c echo.Context) (*dto.MediaUploadInput, error) {
 	uploaderID, err := uuid.Parse(c.FormValue("uploader_id"))
 	if err != nil {
@@ -396,3 +438,20 @@ func (r *Routers) parseMediaUploadInput(c echo.Context) (*dto.MediaUploadInput, 
 
 	return input, nil
 }
+
+// func (h *AuthHandler) Refresh(c echo.Context) error {
+//     var req struct {
+//         RefreshToken string `json:"refresh_token"`
+//     }
+
+//     if err := c.Bind(&req); err != nil {
+//         return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
+//     }
+
+//     newTokens, err := h.tokenService.RefreshTokens(req.RefreshToken)
+//     if err != nil {
+//         return echo.NewHTTPError(http.StatusUnauthorized, "invalid refresh token")
+//     }
+
+//     return c.JSON(http.StatusOK, newTokens)
+// }

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"premium_caste/internal/domain/models"
 
@@ -12,6 +13,13 @@ type UserRepository interface {
 	SaveUser(ctx context.Context, user models.User) (uuid.UUID, error)
 	IsAdmin(ctx context.Context, userID uuid.UUID) (bool, error)
 	User(ctx context.Context, email string) (models.User, error)
+}
+
+type TokenRepository interface {
+	SaveRefreshToken(ctx context.Context, userID uuid.UUID, token string, exp time.Duration) error
+	GetRefreshToken(ctx context.Context, userID, token string) (bool, error)
+	DeleteRefreshToken(ctx context.Context, userID, token string) error
+	DeleteAllUserTokens(ctx context.Context, userID string) error
 }
 
 type MediaRepository interface {

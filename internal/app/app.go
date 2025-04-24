@@ -10,6 +10,7 @@ import (
 	media "premium_caste/internal/services/media_service"
 	user "premium_caste/internal/services/user_service"
 	storage "premium_caste/internal/storage/filestorage"
+	redisapp "premium_caste/internal/storage/redis"
 
 	httprouters "premium_caste/internal/transport/http"
 )
@@ -19,11 +20,11 @@ type App struct {
 	Repo       repository.Repository
 }
 
-func New(log *slog.Logger, storagePath string, httpHost, httpPort string, tokenTTL time.Duration, baseDir, baseURL string) *App {
+func New(log *slog.Logger, redisClient *redisapp.Client, storagePath string, httpHost, httpPort string, tokenTTL time.Duration, baseDir, baseURL string) *App {
 	ctx := context.Background()
 	token := "test"
 
-	repo, err := repository.NewRepository(ctx, storagePath)
+	repo, err := repository.NewRepository(ctx, storagePath, redisClient)
 	if err != nil {
 		panic("not init repo")
 	}
@@ -35,6 +36,7 @@ func New(log *slog.Logger, storagePath string, httpHost, httpPort string, tokenT
 
 	userSerivce := user.NewUserService(log, repo.User, tokenTTL)
 	mediaService := media.NewMediaService(log, repo.Media, fileStorage)
+	// authService := auth.NewTokenService(repo.Token)
 
 	httpRouters := httprouters.NewRouter(log, userSerivce, mediaService)
 	httpApp := httpapp.New(log, token, httpHost, httpPort, httpRouters)
