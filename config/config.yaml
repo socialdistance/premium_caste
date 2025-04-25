@@ -4,6 +4,10 @@ token_ttl: 1h
 http:
   host: "127.0.0.1"
   port: "8080"
+redis:
+  redis_addr: "redis:6380"
+  redis_password: "redispassword"
+  redis_db: 0
 file_storage:
   base_dir: "./uploads"
   base_url: "http://localhost:8080/uploads"

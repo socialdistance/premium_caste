@@ -7,6 +7,7 @@ import (
 
 	httpapp "premium_caste/internal/app/http"
 	"premium_caste/internal/repository"
+	auth "premium_caste/internal/services/auth_service"
 	media "premium_caste/internal/services/media_service"
 	user "premium_caste/internal/services/user_service"
 	storage "premium_caste/internal/storage/filestorage"
@@ -34,9 +35,9 @@ func New(log *slog.Logger, redisClient *redisapp.Client, storagePath string, htt
 		panic("not init file storage")
 	}
 
-	userSerivce := user.NewUserService(log, repo.User, tokenTTL)
+	authService := auth.NewTokenService(repo.Token)
+	userSerivce := user.NewUserService(log, repo.User, authService)
 	mediaService := media.NewMediaService(log, repo.Media, fileStorage)
-	// authService := auth.NewTokenService(repo.Token)
 
 	httpRouters := httprouters.NewRouter(log, userSerivce, mediaService)
 	httpApp := httpapp.New(log, token, httpHost, httpPort, httpRouters)

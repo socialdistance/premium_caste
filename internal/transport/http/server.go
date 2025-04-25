@@ -21,7 +21,7 @@ import (
 )
 
 type UserService interface {
-	Login(ctx context.Context, email, password string) (string, error)
+	Login(ctx context.Context, email, password string) (*models.TokenPair, error)
 	RegisterNewUser(ctx context.Context, input dto.UserRegisterInput) (uuid.UUID, error)
 	IsAdmin(ctx context.Context, userID uuid.UUID) (bool, error)
 }
@@ -92,7 +92,7 @@ func (r *Routers) Login(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, response.Response{
 		Status: "success",
-		Data:   map[string]string{"token": token},
+		Data:   map[string]string{"access_token": token.AccessToken, "refresh_token": token.RefreshToken},
 	})
 }
 

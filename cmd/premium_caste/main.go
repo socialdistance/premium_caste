@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -23,8 +24,9 @@ func main() {
 
 	log := setupLogger(cfg.Env)
 
-	redisClient := redisapp.NewClient(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisDB)
+	redisClient := redisapp.NewClient(cfg.Redis.RedisAddr, cfg.Redis.RedisPassword, cfg.Redis.RedisDB)
 	if err := redisClient.Ping(context.Background()).Err(); err != nil {
+		fmt.Println(err)
 		panic("Failed to connect to Redis:")
 	}
 

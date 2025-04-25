@@ -14,6 +14,7 @@ type Config struct {
 	TokenTTL    time.Duration     `yaml:"token_ttl" env-default:"1h"`
 	HTTP        HTTPConfig        `yaml:"http"`
 	FileStorage FileStorageConfig `yaml:"file_storage"`
+	Redis       RedisConf         `yaml:"redis"`
 }
 
 type HTTPConfig struct {
@@ -25,6 +26,12 @@ type FileStorageConfig struct {
 	BaseDir string `yaml:"base_dir"`
 	BaseURL string `yaml:"base_url"`
 	MaxSize int64  `yaml:"max_size"`
+}
+
+type RedisConf struct {
+	RedisAddr     string `yaml:"redis_addr"`
+	RedisPassword string `yaml:"redispassword"`
+	RedisDB       int    `yaml:"redis_db"`
 }
 
 func MustLoad() *Config {

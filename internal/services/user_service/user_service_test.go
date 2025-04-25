@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log/slog"
 	"testing"
-	"time"
 
 	"premium_caste/internal/domain/models"
 	services "premium_caste/internal/services/user_service"
@@ -20,6 +19,10 @@ import (
 )
 
 type MockUserRepository struct {
+	mock.Mock
+}
+
+type MockAuthRepository struct {
 	mock.Mock
 }
 
@@ -41,9 +44,9 @@ func (m *MockUserRepository) IsAdmin(ctx context.Context, userID uuid.UUID) (boo
 func TestUserService_Login(t *testing.T) {
 	ctx := context.Background()
 	mockRepo := new(MockUserRepository)
+	authMock := new(MockAuthRepository)
 	log := slog.Default()
-	tokenTTL := 1 * time.Hour
-	service := services.NewUserService(log, mockRepo, tokenTTL)
+	service := services.NewUserService(log, mockRepo, authMock)
 
 	// Тестовые данные
 	testEmail := "test@example.com"
@@ -97,7 +100,7 @@ func TestUserService_RegisterNewUser(t *testing.T) {
 	ctx := context.Background()
 	mockRepo := new(MockUserRepository)
 	log := slog.Default()
-	service := services.NewUserService(log, mockRepo, 1*time.Hour)
+	service := services.NewUserService(log, mockRepo)
 
 	// Тестовые данные
 	testInput := dto.UserRegisterInput{
@@ -148,7 +151,7 @@ func TestUserService_IsAdmin(t *testing.T) {
 	ctx := context.Background()
 	mockRepo := new(MockUserRepository)
 	log := slog.Default()
-	service := services.NewUserService(log, mockRepo, 1*time.Hour)
+	service := services.NewUserService(log, mockRepo)
 
 	testUserID := uuid.New()
 

@@ -5,12 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"premium_caste/internal/domain/models"
-	"premium_caste/internal/lib/jwt"
 	"premium_caste/internal/lib/logger/sl"
 	"premium_caste/internal/repository"
+	services "premium_caste/internal/services/auth_service"
 	"premium_caste/internal/storage"
 	"premium_caste/internal/transport/http/dto"
 
@@ -25,20 +24,20 @@ var (
 )
 
 type UserService struct {
-	log      *slog.Logger
-	repo     repository.UserRepository
-	tokenTTL time.Duration
+	log         *slog.Logger
+	repo        repository.UserRepository
+	authService *services.TokenService
 }
 
-func NewUserService(log *slog.Logger, repo repository.UserRepository, tokenTTL time.Duration) *UserService {
+func NewUserService(log *slog.Logger, repo repository.UserRepository, authService *services.TokenService) *UserService {
 	return &UserService{
-		log:      log,
-		repo:     repo,
-		tokenTTL: tokenTTL,
+		log:         log,
+		repo:        repo,
+		authService: authService,
 	}
 }
 
-func (u *UserService) Login(ctx context.Context, email, password string) (string, error) {
+func (u *UserService) Login(ctx context.Context, email, password string) (*models.TokenPair, error) {
 	const op = "user_service.Login"
 
 	log := u.log.With(
@@ -53,26 +52,26 @@ func (u *UserService) Login(ctx context.Context, email, password string) (string
 		if errors.Is(err, storage.ErrUserNotFound) {
 			u.log.Warn("user not found", sl.Err(err))
 
-			return "", fmt.Errorf("%s: %w", op, ErrInvalidCredentials)
+			return nil, fmt.Errorf("%s: %w", op, ErrInvalidCredentials)
 		}
 		u.log.Error("failed to get user", sl.Err(err))
 
-		return "", fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	if err := bcrypt.CompareHashAndPassword(user.Password, []byte(password)); err != nil {
 		u.log.Info("invalid credentials", sl.Err(err))
 
-		return "", fmt.Errorf("%s: %w", op, ErrInvalidCredentials)
+		return nil, fmt.Errorf("%s: %w", op, ErrInvalidCredentials)
 	}
 
 	log.Info("user logged in successfully")
 
-	token, err := jwt.NewToken(user, u.tokenTTL)
+	token, err := u.authService.GenerateTokens(user)
 	if err != nil {
 		u.log.Error("failed to generate token", sl.Err(err))
 
-		return "", fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	return token, nil
