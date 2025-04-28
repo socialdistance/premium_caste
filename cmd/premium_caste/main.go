@@ -25,7 +25,7 @@ func main() {
 
 	redisClient := redisapp.NewClient(cfg.Redis.RedisAddr, cfg.Redis.RedisPassword, cfg.Redis.RedisDB)
 	if err := redisClient.HealthCheck(context.Background()); err != nil {
-		panic("Failed to connect to Redis:")
+		panic("Failed to connect to Redis")
 	}
 
 	application := app.New(log, redisClient, cfg.DSN, cfg.HTTP.Host, cfg.HTTP.Port, cfg.TokenTTL, cfg.FileStorage.BaseDir, cfg.FileStorage.BaseURL)

@@ -1,9 +1,8 @@
-version: "3"
 services:
   myapp:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: build/Dockerfile
     container_name: myapp
     restart: unless-stopped
     ports:
@@ -13,24 +12,34 @@ services:
     depends_on:
       - postgres
       - redis
+    # networks:
+    #   - backend
   postgres:
     image: postgres:10
+    container_name: postgres_container
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
       POSTGRES_HOST_AUTH_METHOD: trust
+    # networks:
+    #   - backend
     ports:
       - "54321:5432"
     volumes:
-      - pgdata_file_serivce:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
   redis:
     image: redis:latest
-    container_name: redis_service
+    container_name: redis_container
     environment:
-      - REDIS_USER=redis
-      - REDIS_PASSWORD=redispassword
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-your_secure_password_here}
+    # networks:
+    #   - backend
     ports:
-    #  "127.0.0.1:6379:6379"  # Ограничение доступа только с localhost
       - "6379:6379"
     volumes:
       - ./redisdata:/data
@@ -43,16 +52,15 @@ services:
           cpus: '0.25'
           memory: 256M
     command:
-      # sh -c '
-      #   mkdir -p /usr/local/etc/redis &&
-      #   echo "bind 0.0.0.0" > /usr/local/etc/redis/redis.conf &&
-      #   echo "requirepass $REDIS_PASSWORD" >> /usr/local/etc/redis/redis.conf &&
-      #   echo "appendonly yes" >> /usr/local/etc/redis/redis.conf &&
-      #   echo "appendfsync everysec" >> /usr/local/etc/redis/redis.conf &&
-      #   echo "user default on nopass ~* +@all" > /usr/local/etc/redis/users.acl &&
-      #   echo "user $REDIS_USER on >$REDIS_USER_PASSWORD ~* +@all" >> /usr/local/etc/redis/users.acl &&
-      #   redis-server /usr/local/etc/redis/redis.conf --aclfile /usr/local/etc/redis/users.acl
-      # '
+      - /bin/sh
+      - -c
+      # - Double dollars, so that the variable is not expanded by Docker Compose
+      # - Surround by quotes, so that the shell does not split the password
+      # - The ${variable:?message} syntax causes shell to exit with a non-zero
+      #   code and print a message, when the variable is not set or empty
+      - redis-server --requirepass "$${REDIS_PASSWORD:?REDIS_PASSWORD variable is not set}"
+    # env_file:
+    #   - .env
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "$REDIS_PASSWORD", "ping"]
       interval: 30s
@@ -62,5 +70,10 @@ services:
     tty: true
     stdin_open: true
 
+# networks:
+#   backend:
+#     driver: bridge
+
 volumes:
-  pgdata_file_serivce:
+  pgdata:
+  redisdata:

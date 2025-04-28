@@ -1,11 +1,11 @@
-env: "local" # dev, prod
-dsn: "postgres://postgres:postgres@localhost:54321/premium_caste"
+env: "dev" # dev, prod
+dsn: "postgres://postgres:postgres@postgres:5432/premium_caste"
 token_ttl: 1h
 http:
   host: "127.0.0.1"
   port: "8080"
 redis:
-  redis_addr: "localhost:6379"
+  redis_addr: "redis:6379"
   redis_password: "your_secure_password_here"
   redis_db: 0
 file_storage:

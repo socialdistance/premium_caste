@@ -15,10 +15,10 @@ RUN go mod download
 COPY . .
 
 # Сборка приложения
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/bin/myapp ./cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/bin/myapp ./cmd/premium_caste/main.go
 
 # Финальный этап (минимальный образ)
-FROM alpine:3.19
+FROM alpine:3.21
 
 # Установка runtime зависимостей (если нужны)
 RUN apk add --no-cache ca-certificates tzdata
@@ -27,10 +27,10 @@ RUN apk add --no-cache ca-certificates tzdata
 COPY --from=builder /app/bin/myapp /usr/local/bin/myapp
 
 # Дополнительные файлы (конфиги, миграции и т.д.)
-# COPY --from=builder /app/configs /etc/myapp/configs
+COPY --from=builder /app/config/config_dev.yaml /etc/myapp/configs/config_dev.yaml
 
 # Порт приложения
 EXPOSE 8080
 
 # Команда запуска
-CMD ["myapp"]
+CMD ["myapp", "--config", "/etc/myapp/configs/config_dev.yaml"]
