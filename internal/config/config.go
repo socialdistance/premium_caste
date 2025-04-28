@@ -30,7 +30,7 @@ type FileStorageConfig struct {
 
 type RedisConf struct {
 	RedisAddr     string `yaml:"redis_addr"`
-	RedisPassword string `yaml:"redispassword"`
+	RedisPassword string `yaml:"redis_password"`
 	RedisDB       int    `yaml:"redis_db"`
 }
 

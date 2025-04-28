@@ -16,7 +16,7 @@ type UserRepository interface {
 }
 
 type TokenRepository interface {
-	SaveRefreshToken(ctx context.Context, userID uuid.UUID, token string, exp time.Duration) error
+	SaveRefreshToken(ctx context.Context, userID, token string, exp time.Duration) error
 	GetRefreshToken(ctx context.Context, userID, token string) (bool, error)
 	DeleteRefreshToken(ctx context.Context, userID, token string) error
 	DeleteAllUserTokens(ctx context.Context, userID string) error

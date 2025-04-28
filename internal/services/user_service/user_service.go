@@ -9,7 +9,6 @@ import (
 	"premium_caste/internal/domain/models"
 	"premium_caste/internal/lib/logger/sl"
 	"premium_caste/internal/repository"
-	services "premium_caste/internal/services/auth_service"
 	"premium_caste/internal/storage"
 	"premium_caste/internal/transport/http/dto"
 
@@ -23,13 +22,18 @@ var (
 	ErrUserNotFound       = errors.New("user not found")
 )
 
+type TokenService interface {
+	GenerateTokens(user models.User) (*models.TokenPair, error)
+	RefreshTokens(refreshToken string) (*models.TokenPair, error)
+}
+
 type UserService struct {
 	log         *slog.Logger
 	repo        repository.UserRepository
-	authService *services.TokenService
+	authService TokenService
 }
 
-func NewUserService(log *slog.Logger, repo repository.UserRepository, authService *services.TokenService) *UserService {
+func NewUserService(log *slog.Logger, repo repository.UserRepository, authService TokenService) *UserService {
 	return &UserService{
 		log:         log,
 		repo:        repo,

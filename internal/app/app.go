@@ -7,8 +7,8 @@ import (
 
 	httpapp "premium_caste/internal/app/http"
 	"premium_caste/internal/repository"
-	auth "premium_caste/internal/services/auth_service"
 	media "premium_caste/internal/services/media_service"
+	tokenapp "premium_caste/internal/services/token_service"
 	user "premium_caste/internal/services/user_service"
 	storage "premium_caste/internal/storage/filestorage"
 	redisapp "premium_caste/internal/storage/redis"
@@ -35,11 +35,11 @@ func New(log *slog.Logger, redisClient *redisapp.Client, storagePath string, htt
 		panic("not init file storage")
 	}
 
-	authService := auth.NewTokenService(repo.Token)
-	userSerivce := user.NewUserService(log, repo.User, authService)
+	tokenService := tokenapp.NewTokenService(repo.Token)
+	userSerivce := user.NewUserService(log, repo.User, tokenService)
 	mediaService := media.NewMediaService(log, repo.Media, fileStorage)
 
-	httpRouters := httprouters.NewRouter(log, userSerivce, mediaService)
+	httpRouters := httprouters.NewRouter(log, userSerivce, mediaService, tokenService)
 	httpApp := httpapp.New(log, token, httpHost, httpPort, httpRouters)
 
 	return &App{

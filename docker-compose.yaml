@@ -1,23 +1,19 @@
 version: "3"
 services:
-  #   zookeeper:
-  #   image: 'bitnami/zookeeper:latest'
-  #   ports:
-  #     - '2181:2181'
-  #   environment:
-  #     - ALLOW_ANONYMOUS_LOGIN=yes
-  # kafka:
-  #   image: 'bitnami/kafka:2.7.0'
-  #   ports:
-  #     - '9092:9092'
-  #   depends_on:
-  #     - zookeeper
-  #   environment:
-  #     - ALLOW_PLAINTEXT_LISTENER=yes
-  #     - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
-  #     - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
-  #     - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
-  pg_file_service:
+  myapp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: myapp
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_ENV=production
+    depends_on:
+      - postgres
+      - redis
+  postgres:
     image: postgres:10
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -29,12 +25,13 @@ services:
       - pgdata_file_serivce:/var/lib/postgresql/data
   redis:
     image: redis:latest
+    container_name: redis_service
     environment:
-      - REDIS_PASSWORD=redispassword
       - REDIS_USER=redis
-      - REDIS_USER_PASSWORD=redispassword
+      - REDIS_PASSWORD=redispassword
     ports:
-      - "6380:6379"
+    #  "127.0.0.1:6379:6379"  # Ограничение доступа только с localhost
+      - "6379:6379"
     volumes:
       - ./redisdata:/data
     deploy:
@@ -45,7 +42,7 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
-    command: redis-server --requirepass redispassword
+    command:
       # sh -c '
       #   mkdir -p /usr/local/etc/redis &&
       #   echo "bind 0.0.0.0" > /usr/local/etc/redis/redis.conf &&

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 
 	_ "premium_caste/docs"
@@ -33,17 +34,24 @@ type MediaService interface {
 	ListGroupMedia(ctx context.Context, groupID uuid.UUID) ([]models.Media, error)
 }
 
+type AuthService interface {
+	GenerateTokens(user models.User) (*models.TokenPair, error)
+	RefreshTokens(refreshToken string) (*models.TokenPair, error)
+}
+
 type Routers struct {
 	log          *slog.Logger
 	UserService  UserService
 	MediaService MediaService
+	AuthService  AuthService
 }
 
-func NewRouter(log *slog.Logger, userService UserService, mediaService MediaService) *Routers {
+func NewRouter(log *slog.Logger, userService UserService, mediaService MediaService, authService AuthService) *Routers {
 	return &Routers{
 		log:          log,
 		UserService:  userService,
 		MediaService: mediaService,
+		AuthService:  authService,
 	}
 }
 
@@ -153,6 +161,23 @@ func (r *Routers) Register(c echo.Context) error {
 	})
 }
 
+func (r *Routers) Refresh(c echo.Context) error {
+	var req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
+	}
+
+	newTokens, err := r.AuthService.RefreshTokens(req.RefreshToken)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "invalid refresh token")
+	}
+
+	return c.JSON(http.StatusOK, newTokens)
+}
+
 // IsAdminPermission
 // @Summary Проверка административного статуса пользователя
 // @Description Проверяет, является ли указанный пользователь администратором
@@ -185,6 +210,10 @@ func (r *Routers) IsAdminPermission(c echo.Context) error {
 			"error": "failed to check admin status",
 		})
 	}
+
+	sess, _ := session.Get("session", c)
+	sess.Values["user_id"] = userID.String()
+	sess.Save(c.Request(), c.Response())
 
 	return c.JSON(http.StatusOK, map[string]bool{
 		"is_admin": isAdmin,
@@ -438,20 +467,3 @@ func (r *Routers) parseMediaUploadInput(c echo.Context) (*dto.MediaUploadInput, 
 
 	return input, nil
 }
-
-// func (h *AuthHandler) Refresh(c echo.Context) error {
-//     var req struct {
-//         RefreshToken string `json:"refresh_token"`
-//     }
-
-//     if err := c.Bind(&req); err != nil {
-//         return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
-//     }
-
-//     newTokens, err := h.tokenService.RefreshTokens(req.RefreshToken)
-//     if err != nil {
-//         return echo.NewHTTPError(http.StatusUnauthorized, "invalid refresh token")
-//     }
-
-//     return c.JSON(http.StatusOK, newTokens)
-// }

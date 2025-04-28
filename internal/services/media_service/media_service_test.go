@@ -1,4 +1,4 @@
-package services_test
+package services
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"premium_caste/internal/domain/models"
-	services "premium_caste/internal/services/media_service"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -195,7 +194,7 @@ func TestAttachMediaToGroup(t *testing.T) {
 
 	log := slog.Default()
 
-	service := services.NewMediaService(log, mockRepo, storageMock)
+	service := NewMediaService(log, mockRepo, storageMock)
 
 	validGroupID := uuid.New()
 	validMediaID := uuid.New()
@@ -231,7 +230,7 @@ func TestAttachMedia(t *testing.T) {
 
 	log := slog.Default()
 
-	service := services.NewMediaService(log, mockRepo, storageMock)
+	service := NewMediaService(log, mockRepo, storageMock)
 
 	validOwnerID := uuid.New()
 	description := "cats"
@@ -288,7 +287,7 @@ func TestMediaService_ListGroupMedia(t *testing.T) {
 
 	log := slog.Default()
 
-	service := services.NewMediaService(log, mockRepo, storageMock)
+	service := NewMediaService(log, mockRepo, storageMock)
 
 	t.Run("Succesfull get media by group id", func(t *testing.T) {
 		mockRepo.On("GetMediaByGroupID", mock.Anything, testGroupID).Return(testMedia, nil)

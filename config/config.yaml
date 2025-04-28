@@ -5,7 +5,7 @@ http:
   host: "127.0.0.1"
   port: "8080"
 redis:
-  redis_addr: "redis:6380"
+  redis_addr: "localhost:6379"
   redis_password: "redispassword"
   redis_db: 0
 file_storage:

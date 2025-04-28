@@ -21,7 +21,7 @@ var (
 const (
 	AccessTokenExpire  = 15 * time.Minute
 	RefreshTokenExpire = 7 * 24 * time.Hour
-	SecretKey          = "your_secure_secret_key" // Замените на env переменную
+	SecretKey          = "test"
 )
 
 type TokenService struct {
@@ -43,7 +43,7 @@ func (s *TokenService) GenerateTokens(user models.User) (*models.TokenPair, erro
 		return nil, err
 	}
 
-	err = s.repo.SaveRefreshToken(context.Background(), user.ID, refreshToken, RefreshTokenExpire)
+	err = s.repo.SaveRefreshToken(context.Background(), user.ID.String(), refreshToken, RefreshTokenExpire)
 	if err != nil {
 		return nil, err
 	}
@@ -57,9 +57,8 @@ func (s *TokenService) GenerateTokens(user models.User) (*models.TokenPair, erro
 func (s *TokenService) RefreshTokens(refreshToken string) (*models.TokenPair, error) {
 	token, _, err := new(jwt.Parser).ParseUnverified(refreshToken, jwt.MapClaims{})
 	if err != nil {
-		return nil, err
+		return nil, ErrInvalidToken
 	}
-
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
 		return nil, ErrInvalidToken

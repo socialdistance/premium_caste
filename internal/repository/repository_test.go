@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"premium_caste/internal/domain/models"
 	"premium_caste/internal/repository"
+	redisapp "premium_caste/internal/storage/redis"
 	"testing"
 	"time"
 
+	"github.com/go-redis/redismock/v9"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -486,4 +489,113 @@ func TestUserRepository_IsAdmin(t *testing.T) {
 
 		assert.Equal(t, testUser[1].IsAdmin, isAdmin)
 	})
+}
+
+func NewMockClient() (*redisapp.Client, redismock.ClientMock) {
+	db, mock := redismock.NewClientMock()
+	return &redisapp.Client{Client: db}, mock
+}
+
+func setupRepo() (*repository.RedisTokenRepo, redismock.ClientMock) {
+	db, mock := NewMockClient()
+	return &repository.RedisTokenRepo{Client: db}, mock
+}
+
+func TestSaveRefreshToken(t *testing.T) {
+	ctx := context.Background()
+	repo, mock := setupRepo()
+	userID := uuid.New()
+	token := "test_token"
+	exp := 24 * time.Hour
+
+	t.Run("successful save", func(t *testing.T) {
+		mock.ExpectSet(refreshTokenKey(userID.String(), token), "1", exp).SetVal("OK")
+		err := repo.SaveRefreshToken(ctx, userID.String(), token, exp)
+		assert.NoError(t, err)
+	})
+
+	t.Run("redis error", func(t *testing.T) {
+		mock.ExpectSet(refreshTokenKey(userID.String(), token), "1", exp).SetErr(redis.ErrClosed)
+		err := repo.SaveRefreshToken(ctx, userID.String(), token, exp)
+		assert.ErrorIs(t, err, redis.ErrClosed)
+	})
+}
+
+func TestGetRefreshToken(t *testing.T) {
+	ctx := context.Background()
+	repo, mock := setupRepo()
+	userID := "user123"
+	token := "test_token"
+
+	t.Run("token exists", func(t *testing.T) {
+		mock.ExpectGet(refreshTokenKey(userID, token)).SetVal("1")
+		exists, err := repo.GetRefreshToken(ctx, userID, token)
+		assert.NoError(t, err)
+		assert.True(t, exists)
+	})
+
+	t.Run("token not exists", func(t *testing.T) {
+		mock.ExpectGet(refreshTokenKey(userID, token)).RedisNil()
+		exists, err := repo.GetRefreshToken(ctx, userID, token)
+		assert.NoError(t, err)
+		assert.False(t, exists)
+	})
+
+	t.Run("redis error", func(t *testing.T) {
+		mock.ExpectGet(refreshTokenKey(userID, token)).SetErr(redis.ErrClosed)
+		_, err := repo.GetRefreshToken(ctx, userID, token)
+		assert.ErrorIs(t, err, redis.ErrClosed)
+	})
+}
+
+func TestDeleteRefreshToken(t *testing.T) {
+	ctx := context.Background()
+	repo, mock := setupRepo()
+	userID := "user123"
+	token := "test_token"
+
+	t.Run("successful delete", func(t *testing.T) {
+		mock.ExpectDel(refreshTokenKey(userID, token)).SetVal(1)
+		err := repo.DeleteRefreshToken(ctx, userID, token)
+		assert.NoError(t, err)
+	})
+
+	t.Run("redis error", func(t *testing.T) {
+		mock.ExpectDel(refreshTokenKey(userID, token)).SetErr(redis.ErrClosed)
+		err := repo.DeleteRefreshToken(ctx, userID, token)
+		assert.ErrorIs(t, err, redis.ErrClosed)
+	})
+}
+
+func TestDeleteAllUserTokens(t *testing.T) {
+	ctx := context.Background()
+	repo, mock := setupRepo()
+	userID := "user123"
+
+	t.Run("successful delete all", func(t *testing.T) {
+		pattern := refreshTokenKey(userID, "*")
+		mock.ExpectKeys(pattern).SetVal([]string{"token1", "token2"})
+		mock.ExpectDel("token1", "token2").SetVal(2)
+		err := repo.DeleteAllUserTokens(ctx, userID)
+		assert.NoError(t, err)
+	})
+
+	t.Run("keys error", func(t *testing.T) {
+		pattern := refreshTokenKey(userID, "*")
+		mock.ExpectKeys(pattern).SetErr(redis.ErrClosed)
+		err := repo.DeleteAllUserTokens(ctx, userID)
+		assert.ErrorIs(t, err, redis.ErrClosed)
+	})
+
+	t.Run("del error", func(t *testing.T) {
+		pattern := refreshTokenKey(userID, "*")
+		mock.ExpectKeys(pattern).SetVal([]string{"token1"})
+		mock.ExpectDel("token1").SetErr(redis.ErrClosed)
+		err := repo.DeleteAllUserTokens(ctx, userID)
+		assert.ErrorIs(t, err, redis.ErrClosed)
+	})
+}
+
+func refreshTokenKey(userID, token string) string {
+	return "refresh:" + userID + ":" + token
 }

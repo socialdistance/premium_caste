@@ -1,4 +1,4 @@
-package services_test
+package services
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"premium_caste/internal/domain/models"
-	services "premium_caste/internal/services/user_service"
 	"premium_caste/internal/storage"
 	"premium_caste/internal/transport/http/dto"
 
@@ -19,10 +18,6 @@ import (
 )
 
 type MockUserRepository struct {
-	mock.Mock
-}
-
-type MockAuthRepository struct {
 	mock.Mock
 }
 
@@ -41,14 +36,27 @@ func (m *MockUserRepository) IsAdmin(ctx context.Context, userID uuid.UUID) (boo
 	return args.Bool(0), args.Error(1)
 }
 
+type MockTokenService struct {
+	mock.Mock
+}
+
+func (m *MockTokenService) GenerateTokens(user models.User) (*models.TokenPair, error) {
+	args := m.Called(user)
+	return args.Get(0).(*models.TokenPair), args.Error(1)
+}
+
+func (m *MockTokenService) RefreshTokens(refreshToken string) (*models.TokenPair, error) {
+	args := m.Called(refreshToken)
+	return args.Get(0).(*models.TokenPair), args.Error(1)
+}
 func TestUserService_Login(t *testing.T) {
 	ctx := context.Background()
 	mockRepo := new(MockUserRepository)
-	authMock := new(MockAuthRepository)
+	mockToken := new(MockTokenService)
 	log := slog.Default()
-	service := services.NewUserService(log, mockRepo, authMock)
 
-	// Тестовые данные
+	service := NewUserService(log, mockRepo, mockToken)
+
 	testEmail := "test@example.com"
 	testPassword := "password123"
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.DefaultCost)
@@ -57,8 +65,15 @@ func TestUserService_Login(t *testing.T) {
 		Password: hashedPassword,
 	}
 
+	expectedTokens := &models.TokenPair{
+		AccessToken:  "test_access_token",
+		RefreshToken: "test_refresh_token",
+	}
+
 	t.Run("successful login", func(t *testing.T) {
 		mockRepo.On("User", ctx, testEmail).Return(testUser, nil).Once()
+		mockToken.On("GenerateTokens", testUser).Return(expectedTokens, nil).Once()
+		mockToken.On("RefreshTokens", testUser).Return(expectedTokens, nil).Once()
 
 		token, err := service.Login(ctx, testEmail, testPassword)
 		require.NoError(t, err)
@@ -76,7 +91,7 @@ func TestUserService_Login(t *testing.T) {
 		mockRepo.On("User", ctx, testEmail).Return(testUser, nil).Once()
 
 		_, err := service.Login(ctx, testEmail, "wrong_password")
-		assert.ErrorIs(t, err, services.ErrInvalidCredentials)
+		assert.ErrorIs(t, err, ErrInvalidCredentials)
 	})
 
 	t.Run("user not found", func(t *testing.T) {
@@ -84,7 +99,7 @@ func TestUserService_Login(t *testing.T) {
 			Return(models.User{}, storage.ErrUserNotFound).Once()
 
 		_, err := service.Login(ctx, "nonexistent@example.com", testPassword)
-		assert.ErrorIs(t, err, services.ErrInvalidCredentials)
+		assert.ErrorIs(t, err, ErrInvalidCredentials)
 	})
 
 	t.Run("repository error", func(t *testing.T) {
@@ -99,8 +114,9 @@ func TestUserService_Login(t *testing.T) {
 func TestUserService_RegisterNewUser(t *testing.T) {
 	ctx := context.Background()
 	mockRepo := new(MockUserRepository)
+	mockToken := new(MockTokenService)
 	log := slog.Default()
-	service := services.NewUserService(log, mockRepo)
+	service := NewUserService(log, mockRepo, mockToken)
 
 	// Тестовые данные
 	testInput := dto.UserRegisterInput{
@@ -126,7 +142,7 @@ func TestUserService_RegisterNewUser(t *testing.T) {
 			Return(uuid.Nil, storage.ErrUserExists).Once()
 
 		_, err := service.RegisterNewUser(ctx, testInput)
-		assert.ErrorIs(t, err, services.ErrUserExist)
+		assert.ErrorIs(t, err, storage.ErrUserExists)
 	})
 
 	t.Run("repository error", func(t *testing.T) {
@@ -150,8 +166,9 @@ func TestUserService_RegisterNewUser(t *testing.T) {
 func TestUserService_IsAdmin(t *testing.T) {
 	ctx := context.Background()
 	mockRepo := new(MockUserRepository)
+	mockToken := new(MockTokenService)
 	log := slog.Default()
-	service := services.NewUserService(log, mockRepo)
+	service := NewUserService(log, mockRepo, mockToken)
 
 	testUserID := uuid.New()
 

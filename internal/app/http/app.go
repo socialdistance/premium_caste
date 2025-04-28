@@ -12,6 +12,8 @@ import (
 	"github.com/arl/statsviz"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
+	"github.com/gorilla/sessions"
+	"github.com/labstack/echo-contrib/session"
 	echojwt "github.com/labstack/echo-jwt"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -48,12 +50,10 @@ func New(log *slog.Logger, token string, host, port string, routers *httprouters
 	//     AllowMethods: []string{echo.GET, echo.PUT, echo.POST, echo.DELETE},
 	// }))
 
+	e.Use(session.Middleware(sessions.NewCookieStore([]byte("test"))))
+
 	e.Use(middleware.CORS())
 	e.Use(middleware.Recover())
-
-	// e.Use(echojwt.WithConfig(echojwt.Config{
-	// 	SigningKey: []byte(token),
-	// }))
 
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogURI:      true,
@@ -122,18 +122,14 @@ func (s *Server) Stop() error {
 	return nil
 }
 
-// func (s *Server) jwtMiddleware() echo.MiddlewareFunc {
-// 	return echojwt.WithConfig(echojwt.Config{
-// 		SigningKey:  []byte(s.token),
-// 		TokenLookup: "header:Authorization",
-// 	})
-// }
-
 func (s *Server) adminOnlyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		userID, ok := c.Get("user").(string)
-		fmt.Println(userID)
-		fmt.Println(ok)
+		sess, err := session.Get("session", c)
+		if err != nil {
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "session required"})
+		}
+
+		userID, ok := sess.Values["user_id"].(string)
 		if !ok || userID == "" {
 			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "authentication required"})
 		}
@@ -153,11 +149,11 @@ func (s *Server) adminOnlyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 func (s *Server) BuildRouters() {
-	// API v1 routes
 	api := s.e.Group("/api/v1")
 	{
 		api.POST("/register", s.routers.Register)
 		api.POST("/login", s.routers.Login)
+		api.POST("/refresh", s.routers.Refresh)
 
 		debug := s.e.Group("/debug")
 		{
@@ -179,7 +175,7 @@ func (s *Server) BuildRouters() {
 			// userGroup.GET("/:email", s.routers.GetUserByEmail, s.adminOnlyMiddleware)
 		}
 
-		mediaGroup := api.Group("/media" /* s.jwtMiddleware() */)
+		mediaGroup := api.Group("/media", s.adminOnlyMiddleware)
 		{
 			mediaGroup.POST("/upload", s.routers.UploadMedia)
 			mediaGroup.POST("/groups/attach", s.routers.AttachMediaToGroup)
@@ -187,8 +183,4 @@ func (s *Server) BuildRouters() {
 			mediaGroup.GET("/groups/group_id", s.routers.ListGroupMedia)
 		}
 	}
-
-	//	e.POST("/login", authHandler.Login)
-	//
-	// e.POST("/refresh", authHandler.Refresh)
 }
