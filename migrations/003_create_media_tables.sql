@@ -44,20 +44,19 @@ CREATE TABLE media_group_items (
 CREATE INDEX idx_media_group_items_media ON media_group_items(media_id);
 
 -- Добавляем файл
-INSERT INTO media (uploader_id, media_type, original_filename, storage_path, file_size)
-VALUES ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'photo', 'cat.jpg', '/uploads/2023/cat.jpg', 1024);
+-- INSERT INTO media (uploader_id, media_type, original_filename, storage_path, file_size)
+-- VALUES ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'photo', 'cat.jpg', '/uploads/2023/cat.jpg', 1024);
 
-INSERT INTO media (uploader_id, media_type, original_filename, storage_path, file_size)
-VALUES ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'photo', 'cat123.jpg', '/uploads/2023/cat123.jpg', 1024);
+-- INSERT INTO media (uploader_id, media_type, original_filename, storage_path, file_size)
+-- VALUES ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'photo', 'cat123.jpg', '/uploads/2023/cat123.jpg', 1024);
 
--- Создаем группу
-INSERT INTO media_groups (owner_id, description)
-VALUES ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Мои котики');
+-- -- Создаем группу
+-- INSERT INTO media_groups (owner_id, description)
+-- VALUES ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Мои котики');
 
--- Добавляем файл в группу
+-- -- Добавляем файл в группу
 -- INSERT INTO media_group_items (group_id, media_id)
 -- VALUES ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33');
-
 
 -- SELECT m.* 
 -- FROM media m
