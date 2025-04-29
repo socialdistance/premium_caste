@@ -1,5 +1,5 @@
 env: "dev" # dev, prod
-dsn: "postgres://postgres:postgres@postgres:5432/premium_caste"
+dsn: "postgres://postgres:postgres@postgres:5432/premium_caste?sslmode=disable"
 token_ttl: 1h
 http:
   host: "127.0.0.1"

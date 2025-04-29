@@ -1,0 +1,16 @@
+FROM alpine:3.21
+
+RUN apk add --no-cache \
+    curl \ 
+    postgresql-client \  
+    tzdata && \          
+    rm -rf /var/cache/apk/*
+
+RUN curl -fsSL https://raw.githubusercontent.com/pressly/goose/master/install.sh | sh 
+
+WORKDIR /migrations
+COPY migrations/ ./
+
+RUN goose -version
+
+# CMD ["goose", "--dir", "/migrations", "postgres", "postgres://postgres:postgres@postgres:5432/premium_caste?sslmode=disable", "up"]

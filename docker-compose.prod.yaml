@@ -1,4 +1,17 @@
 services:
+  myapp:
+    build:
+      context: .
+      dockerfile: build/Dockerfile
+    container_name: myapp
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_ENV=production
+    depends_on:
+      - postgres
+      - redis
   postgres:
     image: postgres:10
     container_name: postgres_container
@@ -15,6 +28,19 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+  migrations:
+    build: 
+      context: .
+      dockerfile: build/Dockerfile.migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "echo 'DB: ${POSTGRES_DB:-premium_caste}'; 
+      until pg_isready -h postgres -p 5432 -U ${POSTGRES_USER:-postgres}; do 
+      sleep 2; done;
+      goose -dir /migrations postgres 'user=${POSTGRES_USER:-postgres} password=${POSTGRES_PASSWORD:-postgres} 
+      host=postgres port=5432 dbname=${POSTGRES_DB:-premium_caste} sslmode=disable' up"
   redis:
     image: redis:latest
     container_name: redis_container
