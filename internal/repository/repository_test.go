@@ -112,7 +112,30 @@ func applyMigrations(pool *pgxpool.Pool) error {
 			basket_id UUID,
 			last_login TIMESTAMP WITH TIME ZONE
 		);
+
+		CREATE TABLE IF NOT EXISTS blog_posts (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			title VARCHAR(255) NOT NULL,                  
+			slug VARCHAR(255) UNIQUE NOT NULL,           
+			excerpt TEXT,                               
+			content TEXT NOT NULL,                       
+			featured_image_id UUID,  
+			author_id UUID NOT NULL,                     
+			status VARCHAR(20) NOT NULL DEFAULT 'draft',  
+			published_at TIMESTAMPTZ,                    
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			metadata JSONB                               
+		);
+
+		CREATE TABLE IF NOT EXISTS post_media_groups (
+			post_id UUID NOT NULL REFERENCES blog_posts(id) ON DELETE CASCADE,
+			group_id UUID NOT NULL REFERENCES media_groups(id) ON DELETE CASCADE,
+			relation_type VARCHAR(30) NOT NULL DEFAULT 'content', 
+			PRIMARY KEY (post_id, group_id)
+		);    
 	`)
+
 	return err
 }
 
@@ -599,3 +622,296 @@ func TestDeleteAllUserTokens(t *testing.T) {
 func refreshTokenKey(userID, token string) string {
 	return "refresh:" + userID + ":" + token
 }
+
+func TestSaveBlogPost(t *testing.T) {
+	ctx := context.Background()
+	pool := setupTestDB(t)
+
+	repo := repository.NewBlogRepository(pool)
+
+	post := models.BlogPost{
+		Title:           "Test Post",
+		Slug:            "test-post",
+		Excerpt:         "Test excerpt",
+		Content:         "Test content",
+		FeaturedImageID: uuid.New(),
+		AuthorID:        uuid.New(),
+	}
+
+	t.Run("successful save", func(t *testing.T) {
+		id, err := repo.SaveBlogPost(ctx, post)
+		assert.NoError(t, err)
+		assert.NotNil(t, id)
+	})
+
+	t.Run("empty fields validation", func(t *testing.T) {
+		invalidPost := post
+		invalidPost.Title = ""
+		_, err := repo.SaveBlogPost(ctx, invalidPost)
+		assert.Error(t, err)
+	})
+
+	t.Run("database error", func(t *testing.T) {
+		_, err := repo.SaveBlogPost(ctx, post)
+		assert.Error(t, err)
+	})
+}
+
+func TestUpdateBlogPostFields(t *testing.T) {
+	ctx := context.Background()
+	pool := setupTestDB(t)
+
+	repo := repository.NewBlogRepository(pool)
+
+	postID := uuid.New()
+	now := time.Now()
+
+	t.Run("successful update", func(t *testing.T) {
+		err := repo.UpdateBlogPostFields(ctx, postID, map[string]interface{}{
+			"title":        "New Title",
+			"content":      "new-content",
+			"published_at": now,
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("successful update one filter", func(t *testing.T) {
+		err := repo.UpdateBlogPostFields(ctx, postID, map[string]interface{}{
+			"title": "New Title",
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("invalid field", func(t *testing.T) {
+		err := repo.UpdateBlogPostFields(ctx, postID, map[string]interface{}{
+			"invalid_field": "value",
+		})
+		assert.Error(t, err)
+	})
+
+	t.Run("no fields to update", func(t *testing.T) {
+		err := repo.UpdateBlogPostFields(ctx, postID, map[string]interface{}{})
+		assert.Error(t, err)
+	})
+}
+
+func TestDeleteBlogPost(t *testing.T) {
+	ctx := context.Background()
+	pool := setupTestDB(t)
+
+	repo := repository.NewBlogRepository(pool)
+
+	post := models.BlogPost{
+		Title:           "Test Post",
+		Slug:            "test-post",
+		Excerpt:         "Test excerpt",
+		Content:         "Test content",
+		FeaturedImageID: uuid.New(),
+		AuthorID:        uuid.New(),
+	}
+
+	postID, err := repo.SaveBlogPost(ctx, post)
+	assert.NoError(t, err)
+
+	t.Run("successful delete", func(t *testing.T) {
+		err := repo.DeleteBlogPost(ctx, postID)
+		assert.NoError(t, err)
+	})
+
+	t.Run("post not found", func(t *testing.T) {
+		err := repo.DeleteBlogPost(ctx, postID)
+		assert.Error(t, err)
+	})
+
+	t.Run("database error", func(t *testing.T) {
+		err := repo.DeleteBlogPost(ctx, postID)
+		assert.Error(t, err)
+	})
+}
+
+func TestGetBlogPosts(t *testing.T) {
+	ctx := context.Background()
+	pool := setupTestDB(t) // Убедитесь, что эта функция корректно инициализирует тестовую БД
+	repo := repository.NewBlogRepository(pool)
+
+	// Создаем тестовые данные
+	now := time.Now()
+	testPosts := []models.BlogPost{
+		{
+			Title:       "Post 1",
+			Slug:        "post-1", // Добавлено обязательное поле
+			Excerpt:     "Excerpt 1",
+			Content:     "Content 1",
+			Status:      "published",
+			PublishedAt: &now,
+			AuthorID:    uuid.New(), // Добавлено обязательное поле
+		},
+		{
+			Title:       "Post 2",
+			Slug:        "post-2",
+			Excerpt:     "Excerpt 2",
+			Content:     "Content 2",
+			Status:      "published",
+			PublishedAt: &now,
+			AuthorID:    uuid.New(),
+		},
+		{
+			Title:       "Post 3",
+			Slug:        "post-3",
+			Excerpt:     "Excerpt 3",
+			Content:     "Content 3",
+			Status:      "archived",
+			PublishedAt: &now,
+			AuthorID:    uuid.New(),
+		},
+		{
+			Title:       "Post 4",
+			Slug:        "post-4",
+			Excerpt:     "Excerpt 4",
+			Content:     "Content 4",
+			Status:      "draft",
+			PublishedAt: nil, // Черновики могут не иметь даты публикации
+			AuthorID:    uuid.New(),
+		},
+		{
+			Title:       "Post 5",
+			Slug:        "post-5",
+			Excerpt:     "Excerpt 5",
+			Content:     "Content 5",
+			Status:      "draft",
+			PublishedAt: nil,
+			AuthorID:    uuid.New(),
+		},
+	}
+
+	// Заполняем БД тестовыми данными
+	for _, post := range testPosts {
+		_, err := repo.SaveBlogPost(ctx, post)
+		if err != nil {
+			t.Fatalf("Failed to seed test data: %v", err)
+		}
+	}
+
+	t.Run("successful published posts", func(t *testing.T) {
+		posts, total, err := repo.GetBlogPosts(ctx, "published", 1, 10)
+		fmt.Println(posts, total, err)
+		assert.NoError(t, err)
+	})
+
+	// Тест кейсы
+	// tests := []struct {
+	// 	name          string
+	// 	statusFilter  string
+	// 	expectedTotal int
+	// 	expectedCount int
+	// 	wantErr       bool
+	// }{
+	// 	{
+	// 		name:          "get published posts",
+	// 		statusFilter:  "published",
+	// 		expectedTotal: 2,
+	// 		expectedCount: 2,
+	// 		wantErr:       false,
+	// 	},
+	// 	{
+	// 		name:          "get draft posts",
+	// 		statusFilter:  "draft",
+	// 		expectedTotal: 2,
+	// 		expectedCount: 2,
+	// 		wantErr:       false,
+	// 	},
+	// 	{
+	// 		name:          "get archived posts",
+	// 		statusFilter:  "archived",
+	// 		expectedTotal: 1,
+	// 		expectedCount: 1,
+	// 		wantErr:       false,
+	// 	},
+	// 	{
+	// 		name:          "get all posts",
+	// 		statusFilter:  "all",
+	// 		expectedTotal: 5,
+	// 		expectedCount: 5,
+	// 		wantErr:       false,
+	// 	},
+	// 	{
+	// 		name:          "invalid status filter",
+	// 		statusFilter:  "invalid",
+	// 		expectedTotal: 0,
+	// 		expectedCount: 0,
+	// 		wantErr:       true,
+	// 	},
+	// }
+
+	// for _, tt := range tests {
+	// 	t.Run(tt.name, func(t *testing.T) {
+	// 		posts, total, err := repo.GetBlogPosts(ctx, tt.statusFilter, 1, 10)
+
+	// 		if tt.wantErr {
+	// 			assert.Error(t, err)
+	// 			return
+	// 		}
+
+	// 		assert.NoError(t, err)
+	// 		assert.Equal(t, tt.expectedTotal, total)
+	// 		assert.Len(t, posts, tt.expectedCount)
+
+	// 		// Дополнительная проверка статусов возвращаемых постов
+	// 		for _, post := range posts {
+	// 			if tt.statusFilter != "all" {
+	// 				assert.Equal(t, tt.statusFilter, post.Status)
+	// 			}
+	// 		}
+	// 	})
+	// }
+
+	// Отдельный тест для пагинации
+	// t.Run("pagination", func(t *testing.T) {
+	// 	// Первая страница (2 элемента)
+	// 	posts, total, err := repo.GetBlogPosts(ctx, "all", 1, 2)
+	// 	assert.NoError(t, err)
+	// 	assert.Equal(t, 5, total)
+	// 	assert.Len(t, posts, 2)
+
+	// 	// Вторая страница (2 элемента)
+	// 	posts, total, err = repo.GetBlogPosts(ctx, "all", 2, 2)
+	// 	assert.NoError(t, err)
+	// 	assert.Equal(t, 5, total)
+	// 	assert.Len(t, posts, 2)
+
+	// 	// Третья страница (1 элемент)
+	// 	posts, total, err = repo.GetBlogPosts(ctx, "all", 3, 2)
+	// 	assert.NoError(t, err)
+	// 	assert.Equal(t, 5, total)
+	// 	assert.Len(t, posts, 1)
+	// })
+}
+
+// func TestMediaGroupOperations(t *testing.T) {
+// 	ctx := context.Background()
+// 	repo, mock, teardown := setupBlogRepo(t)
+// 	defer teardown()
+
+// 	postID := uuid.New()
+// 	groupID := uuid.New()
+
+// 	t.Run("successful add media group", func(t *testing.T) {
+// 		mock.ExpectExec(`INSERT INTO post_media_groups`).
+// 			WithArgs(postID, groupID, "gallery").
+// 			WillReturnResult(sqlmock.NewResult(0, 1))
+
+// 		err := repo.AddMediaGroupToPost(ctx, postID, groupID, "gallery")
+// 		assert.NoError(t, err)
+// 	})
+
+// 	t.Run("get media groups", func(t *testing.T) {
+// 		mock.ExpectQuery(`SELECT group_id FROM post_media_groups`).
+// 			WithArgs(postID).
+// 			WillReturnRows(sqlmock.NewRows([]string{"group_id"}).AddRow(groupID))
+
+// 		groups, err := repo.GetPostMediaGroups(ctx, postID, "")
+// 		assert.NoError(t, err)
+// 		assert.Len(t, groups, 1)
+// 		assert.Equal(t, groupID, groups[0])
+// 	})
+// }
