@@ -2,12 +2,14 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"premium_caste/internal/domain/models"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
@@ -34,6 +36,7 @@ func (b *BlogRepo) SaveBlogPost(ctx context.Context, blogPost models.BlogPost) (
 			"content",
 			"featured_image_id",
 			"author_id",
+			"status",
 			"metadata",
 		).
 		Values(
@@ -43,6 +46,7 @@ func (b *BlogRepo) SaveBlogPost(ctx context.Context, blogPost models.BlogPost) (
 			blogPost.Content,
 			blogPost.FeaturedImageID,
 			blogPost.AuthorID,
+			blogPost.Status,
 			blogPost.Metadata,
 		).
 		Suffix("RETURNING id").
@@ -186,7 +190,7 @@ func (b *BlogRepo) GetBlogPosts(
 	}
 
 	// Получаем общее количество постов (для пагинации)
-	totalCount, err := b.getTotalCount(ctx, queryBuilder)
+	totalCount, err := b.getTotalCount(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("%s: %w", op, err)
 	}
@@ -242,16 +246,22 @@ func (b *BlogRepo) GetBlogPosts(
 	// drafts, total, err := repo.GetBlogPosts(ctx, "draft", 2, 5)
 }
 
-func (b *BlogRepo) getTotalCount(ctx context.Context, queryBuilder sq.SelectBuilder) (int, error) {
+func (b *BlogRepo) getTotalCount(ctx context.Context) (int, error) {
+	queryBuilder := sq.Select("COUNT(*)").
+		From("blog_posts")
+
 	query, args, err := queryBuilder.ToSql()
 	if err != nil {
-		return 0, fmt.Errorf("failed to build count query: %w", err)
+		return 0, fmt.Errorf("error build query: %w", err)
 	}
 
 	var count int
 	err = b.db.QueryRow(ctx, query, args...).Scan(&count)
 	if err != nil {
-		return 0, fmt.Errorf("failed to execute count query: %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("error execute query: %w (SQL: %s)", err, query)
 	}
 
 	return count, nil

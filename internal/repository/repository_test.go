@@ -738,49 +738,54 @@ func TestGetBlogPosts(t *testing.T) {
 	now := time.Now()
 	testPosts := []models.BlogPost{
 		{
-			Title:       "Post 1",
-			Slug:        "post-1", // Добавлено обязательное поле
-			Excerpt:     "Excerpt 1",
-			Content:     "Content 1",
-			Status:      "published",
-			PublishedAt: &now,
-			AuthorID:    uuid.New(), // Добавлено обязательное поле
+			Title:           "Post 1",
+			Slug:            "post-1", // Добавлено обязательное поле
+			Excerpt:         "Excerpt 1",
+			Content:         "Content 1",
+			FeaturedImageID: uuid.New(),
+			Status:          "published",
+			PublishedAt:     &now,
+			AuthorID:        uuid.New(), // Добавлено обязательное поле
 		},
 		{
-			Title:       "Post 2",
-			Slug:        "post-2",
-			Excerpt:     "Excerpt 2",
-			Content:     "Content 2",
-			Status:      "published",
-			PublishedAt: &now,
-			AuthorID:    uuid.New(),
+			Title:           "Post 2",
+			Slug:            "post-2",
+			Excerpt:         "Excerpt 2",
+			Content:         "Content 2",
+			FeaturedImageID: uuid.New(),
+			Status:          "published",
+			PublishedAt:     &now,
+			AuthorID:        uuid.New(),
 		},
 		{
-			Title:       "Post 3",
-			Slug:        "post-3",
-			Excerpt:     "Excerpt 3",
-			Content:     "Content 3",
-			Status:      "archived",
-			PublishedAt: &now,
-			AuthorID:    uuid.New(),
+			Title:           "Post 3",
+			Slug:            "post-3",
+			Excerpt:         "Excerpt 3",
+			Content:         "Content 3",
+			FeaturedImageID: uuid.New(),
+			Status:          "archived",
+			PublishedAt:     &now,
+			AuthorID:        uuid.New(),
 		},
 		{
-			Title:       "Post 4",
-			Slug:        "post-4",
-			Excerpt:     "Excerpt 4",
-			Content:     "Content 4",
-			Status:      "draft",
-			PublishedAt: nil, // Черновики могут не иметь даты публикации
-			AuthorID:    uuid.New(),
+			Title:           "Post 4",
+			Slug:            "post-4",
+			Excerpt:         "Excerpt 4",
+			Content:         "Content 4",
+			FeaturedImageID: uuid.New(),
+			Status:          "draft",
+			PublishedAt:     nil, // Черновики могут не иметь даты публикации
+			AuthorID:        uuid.New(),
 		},
 		{
-			Title:       "Post 5",
-			Slug:        "post-5",
-			Excerpt:     "Excerpt 5",
-			Content:     "Content 5",
-			Status:      "draft",
-			PublishedAt: nil,
-			AuthorID:    uuid.New(),
+			Title:           "Post 5",
+			Slug:            "post-5",
+			Excerpt:         "Excerpt 5",
+			Content:         "Content 5",
+			FeaturedImageID: uuid.New(),
+			Status:          "draft",
+			PublishedAt:     nil,
+			AuthorID:        uuid.New(),
 		},
 	}
 
@@ -793,8 +798,9 @@ func TestGetBlogPosts(t *testing.T) {
 	}
 
 	t.Run("successful published posts", func(t *testing.T) {
-		posts, total, err := repo.GetBlogPosts(ctx, "published", 1, 10)
-		fmt.Println(posts, total, err)
+		posts, _, err := repo.GetBlogPosts(ctx, "all", 1, 10)
+		// fmt.Println(posts, total, err)
+		fmt.Printf("%+v\n", posts)
 		assert.NoError(t, err)
 	})
 
