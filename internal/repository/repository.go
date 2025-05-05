@@ -13,6 +13,7 @@ type Repository struct {
 	User  UserRepository
 	Media MediaRepository
 	Token TokenRepository
+	Blog  BlogRepository
 }
 
 func NewRepository(ctx context.Context, dsn string, redis *redisapp.Client) (*Repository, error) {
@@ -25,6 +26,7 @@ func NewRepository(ctx context.Context, dsn string, redis *redisapp.Client) (*Re
 		User:  NewUserRepository(db),
 		Media: NewMediaRepository(db),
 		Token: NewRedisTokenRepo(redis),
+		Blog:  NewBlogRepository(db),
 	}, nil
 }
 

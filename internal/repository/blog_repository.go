@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"premium_caste/internal/domain/models"
@@ -159,6 +160,56 @@ func (b *BlogRepo) SoftDeleteBlogPost(ctx context.Context, postID uuid.UUID) err
 	return err
 }
 
+func (b *BlogRepo) GetBlogPostByID(ctx context.Context, postID uuid.UUID) (*models.BlogPost, error) {
+	const op = "repository.blog_repository.GetBlogPostByID"
+
+	queryBuilder := b.sb.Select(
+		"id", "title", "slug", "excerpt", "content",
+		"featured_image_id", "author_id", "status",
+		"published_at", "created_at", "updated_at",
+		"metadata",
+	).
+		From("blog_posts").
+		Where(sq.Eq{"id": postID})
+
+	sqlQuery, args, err := queryBuilder.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build SQL query: %w", err)
+	}
+
+	var post models.BlogPost
+	var publishedAt sql.NullTime
+
+	// Выполнение запроса
+	err = b.db.QueryRow(ctx, sqlQuery, args...).Scan(
+		&post.ID,
+		&post.Title,
+		&post.Slug,
+		&post.Excerpt,
+		&post.Content,
+		&post.FeaturedImageID,
+		&post.AuthorID,
+		&post.Status,
+		&publishedAt,
+		&post.CreatedAt,
+		&post.UpdatedAt,
+		&post.Metadata,
+	)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("%s post not found: %w", op, err)
+		}
+		return nil, fmt.Errorf("%s failed to get post: %w", op, err)
+	}
+
+	if publishedAt.Valid {
+		post.PublishedAt = &publishedAt.Time
+	}
+
+	return &post, nil
+}
+
 func (b *BlogRepo) GetBlogPosts(
 	ctx context.Context,
 	statusFilter string, // "all", "draft", "published", "archived"
@@ -268,6 +319,7 @@ func (b *BlogRepo) getTotalCount(ctx context.Context) (int, error) {
 }
 
 // Добавление связи между постом и медиа-группой
+// relationType -> content/gallery/attachment
 func (b *BlogRepo) AddMediaGroupToPost(ctx context.Context, postID, groupID uuid.UUID, relationType string) error {
 	const op = "repository.blog_repository.AddMediaGroupToPost"
 
