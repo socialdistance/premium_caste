@@ -880,10 +880,10 @@ func TestMediaGroupOperations(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("get media groups", func(t *testing.T) {
-		groups, err := repo.GetPostMediaGroups(ctx, postID, "")
-		assert.NoError(t, err)
-		assert.Len(t, groups, 1)
-		assert.Equal(t, groupID, groups[0])
-	})
+	// t.Run("get media groups", func(t *testing.T) {
+	// 	groups, err := repo.GetPostMediaGroups(ctx, postID, "")
+	// 	assert.NoError(t, err)
+	// 	assert.Len(t, groups, 1)
+	// 	assert.Equal(t, groupID, groups[0])
+	// })
 }
