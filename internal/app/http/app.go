@@ -176,11 +176,31 @@ func (s *Server) BuildRouters() {
 		}
 
 		mediaGroup := api.Group("/media", s.adminOnlyMiddleware)
+		mediaGroup.Use(echojwt.WithConfig(echojwt.Config{
+			SigningKey: []byte(s.token),
+		}))
 		{
 			mediaGroup.POST("/upload", s.routers.UploadMedia)
 			mediaGroup.POST("/groups/attach", s.routers.AttachMediaToGroup)
 			mediaGroup.POST("/groups", s.routers.CreateMediaGroup)
 			mediaGroup.GET("/groups/group_id", s.routers.ListGroupMedia)
+		}
+
+		blogGroup := api.Group("/posts", s.adminOnlyMiddleware)
+		blogGroup.GET("", s.routers.ListPosts)
+		blogGroup.Use(echojwt.WithConfig(echojwt.Config{
+			SigningKey: []byte(s.token),
+		}))
+		{
+			blogGroup.POST("", s.routers.CreatePost)
+			blogGroup.GET("/:id", s.routers.GetPost)
+			blogGroup.PUT("/:id", s.routers.UpdatePost)
+			blogGroup.DELETE("/:id", s.routers.DeletePost)
+			blogGroup.PATCH("/:id/publish", s.routers.PublishPost)
+			blogGroup.PATCH("/:id/archive", s.routers.ArchivePost)
+
+			// postsGroup.POST("/:id/media-groups", s.blogHandler.AddMediaGroup, s.adminOnlyMiddleware)
+			// postsGroup.GET("/:id/media-groups", s.blogHandler.GetPostMediaGroups)
 		}
 	}
 }

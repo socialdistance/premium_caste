@@ -166,9 +166,6 @@ func (s *BlogService) UpdatePost(ctx context.Context, postID uuid.UUID, req dto.
 		}
 	}
 
-	// Обновление временной метки
-	updates["updated_at"] = time.Now()
-
 	// Вызов репозитория
 	err = s.repo.UpdateBlogPostFields(ctx, postID, updates)
 	if err != nil {
@@ -256,7 +253,7 @@ func (s *BlogService) PublishPost(ctx context.Context, postID uuid.UUID) (*dto.B
 	err := s.repo.UpdateBlogPostFields(ctx, postID, map[string]interface{}{
 		"status":       "published",
 		"published_at": &now,
-		"updated_at":   now,
+		// "updated_at":   now,
 	})
 	if err != nil {
 		log.Error("failed to publish post", slog.Any("err", err))

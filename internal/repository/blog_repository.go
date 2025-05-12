@@ -90,6 +90,7 @@ func (b *BlogRepo) UpdateBlogPostFields(ctx context.Context, postID uuid.UUID, u
 		if !allowedFields[field] {
 			return fmt.Errorf("%s: field '%s' is not allowed for update", op, field)
 		}
+
 		updateBuilder = updateBuilder.Set(field, value)
 	}
 
