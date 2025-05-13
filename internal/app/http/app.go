@@ -170,11 +170,7 @@ func (s *Server) adminOnlyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 func (s *Server) BuildRouters() {
-	s.e.GET("/metrics", echo.WrapHandler(promhttp.HandlerFor(
-		s.metricsReg,
-		promhttp.HandlerOpts{},
-	)))
-
+	s.e.GET("/metrics", echo.WrapHandler(promhttp.HandlerFor(s.metricsReg, promhttp.HandlerOpts{})))
 	s.e.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	api := s.e.Group("/api/v1")

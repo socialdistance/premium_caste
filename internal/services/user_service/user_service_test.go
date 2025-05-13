@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"premium_caste/internal/domain/models"
@@ -11,6 +13,7 @@ import (
 	"premium_caste/internal/transport/http/dto"
 
 	"github.com/google/uuid"
+	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -49,11 +52,21 @@ func (m *MockTokenService) RefreshTokens(refreshToken string) (*models.TokenPair
 	args := m.Called(refreshToken)
 	return args.Get(0).(*models.TokenPair), args.Error(1)
 }
+
+func createTestContext() echo.Context {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/login", nil)
+	rec := httptest.NewRecorder()
+	return e.NewContext(req, rec)
+}
+
 func TestUserService_Login(t *testing.T) {
 	ctx := context.Background()
 	mockRepo := new(MockUserRepository)
 	mockToken := new(MockTokenService)
 	log := slog.Default()
+
+	c := createTestContext()
 
 	service := NewUserService(log, mockRepo, mockToken)
 
@@ -75,7 +88,7 @@ func TestUserService_Login(t *testing.T) {
 		mockToken.On("GenerateTokens", testUser).Return(expectedTokens, nil).Once()
 		mockToken.On("RefreshTokens", testUser).Return(expectedTokens, nil).Once()
 
-		token, err := service.Login(ctx, testEmail, testPassword)
+		token, err := service.Login(ctx, c, testEmail, testPassword)
 		require.NoError(t, err)
 		assert.NotEmpty(t, token)
 
@@ -90,7 +103,7 @@ func TestUserService_Login(t *testing.T) {
 	t.Run("invalid password", func(t *testing.T) {
 		mockRepo.On("User", ctx, testEmail).Return(testUser, nil).Once()
 
-		_, err := service.Login(ctx, testEmail, "wrong_password")
+		_, err := service.Login(ctx, c, testEmail, "wrong_password")
 		assert.ErrorIs(t, err, ErrInvalidCredentials)
 	})
 
@@ -98,7 +111,7 @@ func TestUserService_Login(t *testing.T) {
 		mockRepo.On("User", ctx, "nonexistent@example.com").
 			Return(models.User{}, storage.ErrUserNotFound).Once()
 
-		_, err := service.Login(ctx, "nonexistent@example.com", testPassword)
+		_, err := service.Login(ctx, c, "nonexistent@example.com", testPassword)
 		assert.ErrorIs(t, err, ErrInvalidCredentials)
 	})
 
@@ -106,7 +119,7 @@ func TestUserService_Login(t *testing.T) {
 		mockRepo.On("User", ctx, testEmail).
 			Return(models.User{}, errors.New("db error")).Once()
 
-		_, err := service.Login(ctx, testEmail, testPassword)
+		_, err := service.Login(ctx, c, testEmail, testPassword)
 		assert.ErrorContains(t, err, "db error")
 	})
 }

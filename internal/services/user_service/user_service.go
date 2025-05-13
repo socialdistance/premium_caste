@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"time"
 
 	"premium_caste/internal/domain/models"
 	"premium_caste/internal/lib/logger/sl"
@@ -13,6 +15,7 @@ import (
 	"premium_caste/internal/transport/http/dto"
 
 	"github.com/google/uuid"
+	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -41,7 +44,7 @@ func NewUserService(log *slog.Logger, repo repository.UserRepository, authServic
 	}
 }
 
-func (u *UserService) Login(ctx context.Context, email, password string) (*models.TokenPair, error) {
+func (u *UserService) Login(ctx context.Context, c echo.Context, email, password string) (*models.TokenPair, error) {
 	const op = "user_service.Login"
 
 	log := u.log.With(
@@ -77,6 +80,26 @@ func (u *UserService) Login(ctx context.Context, email, password string) (*model
 
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
+
+	http.SetCookie(c.Response().Writer, &http.Cookie{
+		Name:     "access_token",
+		Value:    token.AccessToken,
+		Path:     "/",
+		HttpOnly: true, // Защита от XSS
+		Secure:   true, // Только для HTTPS (в продакшене)
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Now().Add(24 * time.Hour), // Срок действия access-токена
+	})
+
+	http.SetCookie(c.Response().Writer, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    token.RefreshToken,
+		Path:     "/api/v1/refresh", // Путь для refresh-эндпоинта
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Now().Add(7 * 24 * time.Hour), // Срок действия refresh-токена
+	})
 
 	return token, nil
 }

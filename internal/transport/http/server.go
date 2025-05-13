@@ -22,7 +22,7 @@ import (
 )
 
 type UserService interface {
-	Login(ctx context.Context, email, password string) (*models.TokenPair, error)
+	Login(ctx context.Context, c echo.Context, email, password string) (*models.TokenPair, error)
 	RegisterNewUser(ctx context.Context, input dto.UserRegisterInput) (uuid.UUID, error)
 	IsAdmin(ctx context.Context, userID uuid.UUID) (bool, error)
 }
@@ -106,7 +106,7 @@ func (r *Routers) Login(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, response.ErrInvalidRequestFormat)
 	}
 
-	token, err := r.UserService.Login(c.Request().Context(), req.Email, req.Password)
+	token, err := r.UserService.Login(c.Request().Context(), c, req.Email, req.Password)
 	if err != nil {
 		response.ErrAuthenticationFailed.Details = err.Error()
 		return c.JSON(http.StatusUnauthorized, response.ErrAuthenticationFailed)
