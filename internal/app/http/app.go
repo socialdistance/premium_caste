@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"time"
 
+	"premium_caste/internal/metrics"
+	prommiddleware "premium_caste/internal/middleware"
 	httprouters "premium_caste/internal/transport/http"
+	"premium_caste/internal/transport/http/dto/response"
 
-	"github.com/arl/statsviz"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/gorilla/sessions"
@@ -17,6 +19,8 @@ import (
 	echojwt "github.com/labstack/echo-jwt"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
@@ -29,13 +33,13 @@ func (cv *CustomValidator) Validate(i interface{}) error {
 }
 
 type Server struct {
-	m       *http.ServeMux
-	log     *slog.Logger
-	e       *echo.Echo
-	routers *httprouters.Routers
-	host    string
-	port    string
-	token   string
+	log        *slog.Logger
+	e          *echo.Echo
+	routers    *httprouters.Routers
+	metricsReg *prometheus.Registry
+	host       string
+	port       string
+	token      string
 }
 
 func New(log *slog.Logger, token string, host, port string, routers *httprouters.Routers) *Server {
@@ -70,20 +74,17 @@ func New(log *slog.Logger, token string, host, port string, routers *httprouters
 		},
 	}))
 
-	mux := http.NewServeMux()
-	err := statsviz.Register(mux)
-	if err != nil {
-		log.Info("Statsviz start with error", slog.Any("error:", err.Error()))
-	}
+	metricsReg := prometheus.NewRegistry()
+	metrics.RegisterMetrics(metricsReg)
 
 	return &Server{
-		m:       mux,
-		log:     log,
-		e:       e,
-		routers: routers,
-		host:    host,
-		port:    port,
-		token:   token,
+		log:        log,
+		e:          e,
+		routers:    routers,
+		metricsReg: metricsReg,
+		host:       host,
+		port:       port,
+		token:      token,
 	}
 }
 
@@ -100,11 +101,31 @@ func (s *Server) MustRun() {
 func (s *Server) Start() error {
 	const op = "http.Server.Start"
 
-	if err := s.e.Start(fmt.Sprintf(":%s", s.port)); err != nil && err != http.ErrServerClosed {
-		return fmt.Errorf("%s server stopped: %w", op, err)
+	go func() {
+		if err := s.e.Start(fmt.Sprintf(":%s", s.port)); err != nil && err != http.ErrServerClosed {
+			s.log.Error("%s HTTP server stopped", op, slog.Any("error", err))
+		}
+	}()
+
+	// Запуск метрик сервера
+	metricsServer := &http.Server{
+		Addr:    ":9090",
+		Handler: promhttp.HandlerFor(s.metricsReg, promhttp.HandlerOpts{}),
 	}
 
+	go func() {
+		if err := metricsServer.ListenAndServe(); err != nil {
+			s.log.Error("%s HTTP server stopped", op, slog.Any("error", err))
+		}
+	}()
+
 	return nil
+
+	// if err := s.e.Start(fmt.Sprintf(":%s", s.port)); err != nil && err != http.ErrServerClosed {
+	// 	return fmt.Errorf("%s server stopped: %w", op, err)
+	// }
+
+	// return nil
 }
 
 func (s *Server) Stop() error {
@@ -126,22 +147,22 @@ func (s *Server) adminOnlyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		sess, err := session.Get("session", c)
 		if err != nil {
-			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "session required"})
+			return c.JSON(http.StatusUnauthorized, response.ErrorResponse{Error: "session required"})
 		}
 
 		userID, ok := sess.Values["user_id"].(string)
 		if !ok || userID == "" {
-			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+			return c.JSON(http.StatusUnauthorized, response.ErrorResponse{Error: "authentication required"})
 		}
 
 		parsedUUID, err := uuid.Parse(userID)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid user ID format"})
+			return c.JSON(http.StatusBadRequest, response.ErrorResponse{Error: "invalid user ID format"})
 		}
 
 		isAdmin, err := s.routers.UserService.IsAdmin(c.Request().Context(), parsedUUID)
 		if err != nil || !isAdmin {
-			return c.JSON(http.StatusForbidden, map[string]string{"error": "admin access required"})
+			return c.JSON(http.StatusForbidden, response.ErrorResponse{Error: "admin access required"})
 		}
 
 		return next(c)
@@ -149,22 +170,19 @@ func (s *Server) adminOnlyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 func (s *Server) BuildRouters() {
+	s.e.GET("/metrics", echo.WrapHandler(promhttp.HandlerFor(
+		s.metricsReg,
+		promhttp.HandlerOpts{},
+	)))
+
+	s.e.GET("/swagger/*", echoSwagger.WrapHandler)
+
 	api := s.e.Group("/api/v1")
+	api.Use(prommiddleware.PrometheusMetrics)
 	{
 		api.POST("/register", s.routers.Register)
 		api.POST("/login", s.routers.Login)
 		api.POST("/refresh", s.routers.Refresh)
-
-		debug := s.e.Group("/debug")
-		{
-			debug.GET("/statsviz/", echo.WrapHandler(s.m))
-			debug.GET("/statsviz/*", echo.WrapHandler(s.m))
-		}
-
-		swagger := s.e.Group("/swag")
-		{
-			swagger.GET("/swagger/*", echoSwagger.WrapHandler)
-		}
 
 		userGroup := api.Group("/users")
 		userGroup.Use(echojwt.WithConfig(echojwt.Config{
@@ -186,21 +204,20 @@ func (s *Server) BuildRouters() {
 			mediaGroup.GET("/groups/group_id", s.routers.ListGroupMedia)
 		}
 
-		blogGroup := api.Group("/posts", s.adminOnlyMiddleware)
+		blogGroup := api.Group("/posts")
 		blogGroup.GET("", s.routers.ListPosts)
 		blogGroup.Use(echojwt.WithConfig(echojwt.Config{
 			SigningKey: []byte(s.token),
 		}))
 		{
-			blogGroup.POST("", s.routers.CreatePost)
+			blogGroup.POST("", s.routers.CreatePost, s.adminOnlyMiddleware)
 			blogGroup.GET("/:id", s.routers.GetPost)
-			blogGroup.PUT("/:id", s.routers.UpdatePost)
-			blogGroup.DELETE("/:id", s.routers.DeletePost)
-			blogGroup.PATCH("/:id/publish", s.routers.PublishPost)
-			blogGroup.PATCH("/:id/archive", s.routers.ArchivePost)
-
-			// postsGroup.POST("/:id/media-groups", s.blogHandler.AddMediaGroup, s.adminOnlyMiddleware)
-			// postsGroup.GET("/:id/media-groups", s.blogHandler.GetPostMediaGroups)
+			blogGroup.PUT("/:id", s.routers.UpdatePost, s.adminOnlyMiddleware)
+			blogGroup.DELETE("/:id", s.routers.DeletePost, s.adminOnlyMiddleware)
+			blogGroup.PATCH("/:id/publish", s.routers.PublishPost, s.adminOnlyMiddleware)
+			blogGroup.PATCH("/:id/archive", s.routers.ArchivePost, s.adminOnlyMiddleware)
+			blogGroup.POST("/:id/media-groups", s.routers.AddMediaGroup, s.adminOnlyMiddleware)
+			blogGroup.GET("/:id/media-groups", s.routers.GetPostMediaGroups, s.adminOnlyMiddleware)
 		}
 	}
 }

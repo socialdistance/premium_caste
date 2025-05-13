@@ -37,7 +37,7 @@ type BlogRepository interface {
 	DeleteBlogPost(ctx context.Context, postID uuid.UUID) error
 	SoftDeleteBlogPost(ctx context.Context, postID uuid.UUID) error
 	AddMediaGroupToPost(ctx context.Context, postID, groupID uuid.UUID, relationType string) error
-	// GetPostMediaGroups(ctx context.Context, postID uuid.UUID, relationType string) ([]uuid.UUID, error)
+	GetPostMediaGroups(ctx context.Context, postID uuid.UUID, relationType string) ([]uuid.UUID, error)
 	GetBlogPosts(ctx context.Context, statusFilter string, page int, perPage int) ([]models.BlogPost, int, error)
 	GetBlogPostByID(ctx context.Context, postID uuid.UUID) (*models.BlogPost, error)
 }

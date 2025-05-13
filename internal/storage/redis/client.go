@@ -23,3 +23,7 @@ func NewClient(addr, password string, db int) *Client {
 func (c *Client) HealthCheck(ctx context.Context) error {
 	return c.Ping(ctx).Err()
 }
+
+func (c *Client) Close() {
+	c.Conn().Close()
+}

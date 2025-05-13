@@ -48,6 +48,7 @@ type BlogService interface {
 	DeletePost(ctx context.Context, postID uuid.UUID) error
 	AddMediaGroup(ctx context.Context, postID uuid.UUID, req dto.AddMediaGroupRequest) (*dto.PostMediaGroupsResponse, error)
 	ListPosts(ctx context.Context, statusFilter string, page, perPage int) (*dto.BlogPostListResponse, error)
+	GetPostMediaGroups(ctx context.Context, postID uuid.UUID, relationType string) (*dto.PostMediaGroupsResponse, error)
 }
 
 type Routers struct {
@@ -838,9 +839,46 @@ func (r *Routers) AddMediaGroup(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, response.ErrorResponse{Error: err.Error()})
 	}
 
-	resp, err := r.BlogService.AddMediaGroup(c.Request().Context(), postID, *req)
+	_, err = r.BlogService.AddMediaGroup(c.Request().Context(), postID, *req)
 	if err != nil {
 		log.Error("failed add media group", sl.Err(err))
+		return c.JSON(http.StatusBadRequest, response.ErrorResponse{Error: "invalid request data"})
+	}
+
+	return c.JSON(http.StatusOK, response.Response{Data: "succesfull"})
+}
+
+// GetPostMediaGroups godoc
+// @Summary Получить медиа-группы поста
+// @Description Возвращает список медиа-групп, привязанных к посту
+// @Tags Посты
+// @Produce json
+// @Param id path string true "UUID поста" format(uuid)
+// @Param relation_type query string false "Тип связи (content, gallery, attachment)"
+// @Success 200 {object} dto.PostMediaGroupsResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Security ApiKeyAuth
+// @Router /api/v1/posts/{id}/media-groups [get]
+func (r *Routers) GetPostMediaGroups(c echo.Context) error {
+	const op = "http.routers.GetPostMediaGroups"
+
+	log := r.log.With(
+		slog.String("op", op),
+	)
+
+	postID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		log.Error("failed parse uuid", sl.Err(err))
+		return c.JSON(http.StatusBadRequest, response.ErrorResponse{Error: "invalid uuid format"})
+	}
+
+	relationType := c.QueryParam("relation_type")
+
+	resp, err := r.BlogService.GetPostMediaGroups(c.Request().Context(), postID, relationType)
+	if err != nil {
+		log.Error("failed get post media group", sl.Err(err))
 		return c.JSON(http.StatusBadRequest, response.ErrorResponse{Error: "invalid request data"})
 	}
 

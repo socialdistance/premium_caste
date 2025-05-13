@@ -341,36 +341,36 @@ func (b *BlogRepo) AddMediaGroupToPost(ctx context.Context, postID, groupID uuid
 }
 
 // Получение всех медиа-групп поста с фильтрацией по типу связи
-// func (b *BlogRepo) GetPostMediaGroups(ctx context.Context, postID uuid.UUID, relationType string) ([]uuid.UUID, error) {
-// 	const op = "repository.blog_repository.GetPostMediaGroups"
+func (b *BlogRepo) GetPostMediaGroups(ctx context.Context, postID uuid.UUID, relationType string) ([]uuid.UUID, error) {
+	const op = "repository.blog_repository.GetPostMediaGroups"
 
-// 	queryBuilder := b.sb.Select("group_id").
-// 		From("post_media_groups").
-// 		Where(sq.Eq{"post_id": postID})
+	queryBuilder := b.sb.Select("group_id").
+		From("post_media_groups").
+		Where(sq.Eq{"post_id": postID})
 
-// 	if relationType != "" {
-// 		queryBuilder = queryBuilder.Where(sq.Eq{"relation_type": relationType})
-// 	}
+	if relationType != "" {
+		queryBuilder = queryBuilder.Where(sq.Eq{"relation_type": relationType})
+	}
 
-// 	query, args, err := queryBuilder.ToSql()
-// 	if err != nil {
-// 		return nil, fmt.Errorf("%s: %w", op, err)
-// 	}
+	query, args, err := queryBuilder.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
 
-// 	rows, err := b.db.Query(ctx, query, args...)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("%s: %w", op, err)
-// 	}
-// 	defer rows.Close()
+	rows, err := b.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	defer rows.Close()
 
-// 	var groupIDs []uuid.UUID
-// 	for rows.Next() {
-// 		var groupID uuid.UUID
-// 		if err := rows.Scan(&groupID); err != nil {
-// 			return nil, fmt.Errorf("%s: %w", op, err)
-// 		}
-// 		groupIDs = append(groupIDs, groupID)
-// 	}
+	var groupIDs []uuid.UUID
+	for rows.Next() {
+		var groupID uuid.UUID
+		if err := rows.Scan(&groupID); err != nil {
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+		groupIDs = append(groupIDs, groupID)
+	}
 
-// 	return groupIDs, nil
-// }
+	return groupIDs, nil
+}

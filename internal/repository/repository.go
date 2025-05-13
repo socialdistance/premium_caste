@@ -30,6 +30,10 @@ func NewRepository(ctx context.Context, dsn string, redis *redisapp.Client) (*Re
 	}, nil
 }
 
-func (r *Repository) Close() {
-	r.db.Close()
+func (r *Repository) Close() error {
+	if r != nil && r.db != nil {
+		r.db.Close()
+	}
+
+	return nil
 }

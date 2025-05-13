@@ -333,38 +333,38 @@ func (s *BlogService) AddMediaGroup(ctx context.Context, postID uuid.UUID, req d
 }
 
 // GetPostMediaGroups возвращает медиа-группы поста
-// func (s *BlogService) GetPostMediaGroups(ctx context.Context, postID uuid.UUID, relationType string) (*dto.PostMediaGroupsResponse, error) {
-// 	const op = "blog_service.GetPostMediaGroups"
-// 	log := s.log.With(
-// 		slog.String("op", op),
-// 		slog.String("post_id", postID.String()),
-// 		slog.String("relation_type", relationType),
-// 	)
+func (s *BlogService) GetPostMediaGroups(ctx context.Context, postID uuid.UUID, relationType string) (*dto.PostMediaGroupsResponse, error) {
+	const op = "blog_service.GetPostMediaGroups"
+	log := s.log.With(
+		slog.String("op", op),
+		slog.String("post_id", postID.String()),
+		slog.String("relation_type", relationType),
+	)
 
-// 	log.Info("getting post media groups")
+	log.Info("getting post media groups")
 
-// 	groups, err := s.repo.GetPostMediaGroups(ctx, postID, relationType)
-// 	if err != nil {
-// 		log.Error("failed to get media groups", slog.Any("err", err))
-// 		return nil, fmt.Errorf("failed to get media groups: %w", err)
-// 	}
+	groups, err := s.repo.GetPostMediaGroups(ctx, postID, relationType)
+	if err != nil {
+		log.Error("failed to get media groups", slog.Any("err", err))
+		return nil, fmt.Errorf("failed to get media groups: %w", err)
+	}
 
-// 	response := &dto.PostMediaGroupsResponse{
-// 		PostID: postID,
-// 		Groups: make([]dto.MediaGroupResponse, 0, len(groups)),
-// 	}
+	response := &dto.PostMediaGroupsResponse{
+		PostID: postID,
+		Groups: make([]dto.MediaGroupResponse, 0, len(groups)),
+	}
 
-// 	for _, group := range groups {
-// 		response.Groups = append(response.Groups, dto.MediaGroupResponse{
-// 			GroupID:      group.GroupID,
-// 			RelationType: group.RelationType,
-// 			AddedAt:      group.CreatedAt,
-// 		})
-// 	}
+	// for _, group := range groups {
+	// 	response.Groups = append(response.Groups, dto.MediaGroupResponse{
+	// 		GroupID:      group.GroupID,
+	// 		RelationType: group.RelationType,
+	// 		AddedAt:      group.CreatedAt,
+	// 	})
+	// }
 
-// 	log.Info("media groups retrieved successfully", slog.Int("count", len(groups)))
-// 	return response, nil
-// }
+	log.Info("media groups retrieved successfully", slog.Int("count", len(groups)))
+	return response, nil
+}
 
 // Вспомогательные функции
 func generateSlug(title string) string {

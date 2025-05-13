@@ -19,6 +19,7 @@ const (
 )
 
 func main() {
+
 	cfg := config.MustLoad()
 
 	log := setupLogger(cfg.Env)
@@ -41,8 +42,8 @@ func main() {
 
 	<-stop
 	application.HTTPServer.Stop()
-	application.Repo.Close()
 	redisClient.Close()
+	application.Repo.Close()
 
 	log.Info("Gracefully stopped")
 	log.Info("application stop")

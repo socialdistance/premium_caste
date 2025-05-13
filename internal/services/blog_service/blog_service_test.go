@@ -58,6 +58,11 @@ func (m *MockBlogRepository) AddMediaGroupToPost(ctx context.Context, postID, gr
 	return args.Error(0)
 }
 
+func (m *MockBlogRepository) GetPostMediaGroups(ctx context.Context, postID uuid.UUID, relationType string) ([]uuid.UUID, error) {
+	args := m.Called(ctx, postID, relationType)
+	return args.Get(0).([]uuid.UUID), args.Error(0)
+}
+
 func TestBlogService_CreatePost(t *testing.T) {
 	ctx := context.Background()
 	log := slog.Default()
