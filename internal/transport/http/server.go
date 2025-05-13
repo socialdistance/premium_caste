@@ -114,7 +114,7 @@ func (r *Routers) Login(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, response.Response{
 		Status: "success",
-		Data:   map[string]string{"access_token": token.AccessToken, "refresh_token": token.RefreshToken},
+		Data:   map[string]string{"user_id": token.UserID.String(), "access_token": token.AccessToken, "refresh_token": token.RefreshToken},
 	})
 }
 

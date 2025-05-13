@@ -13,10 +13,10 @@ import (
 	"premium_caste/internal/transport/http/dto/response"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
-	echojwt "github.com/labstack/echo-jwt"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/prometheus/client_golang/prometheus"
@@ -169,6 +169,49 @@ func (s *Server) adminOnlyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
+func (s *Server) jwtFromCookieMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		// Получаем токен из cookie
+		cookie, err := c.Cookie("access_token")
+		if err != nil {
+			return c.JSON(http.StatusUnauthorized, response.ErrorResponse{
+				Error: "access token required in cookies",
+			})
+		}
+
+		// Валидируем JWT
+		token, err := jwt.Parse(cookie.Value, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return []byte(s.token), nil
+		})
+
+		if err != nil || !token.Valid {
+			return c.JSON(http.StatusUnauthorized, response.ErrorResponse{
+				Error: "invalid or expired token",
+			})
+		}
+
+		if _, ok := token.Claims.(jwt.MapClaims); ok {
+			c.SetCookie(&http.Cookie{
+				Name:     "access_token",
+				Value:    cookie.Value,
+				Expires:  time.Now().Add(1 * time.Hour),
+				Path:     "/",
+				HttpOnly: true,
+				Secure:   true,
+				SameSite: http.SameSiteLaxMode,
+			})
+		}
+
+		// 4. Продолжаем цепочку middleware
+		c.Set("user", token.Claims)
+
+		return next(c)
+	}
+}
+
 func (s *Server) BuildRouters() {
 	s.e.GET("/metrics", echo.WrapHandler(promhttp.HandlerFor(s.metricsReg, promhttp.HandlerOpts{})))
 	s.e.GET("/swagger/*", echoSwagger.WrapHandler)
@@ -181,18 +224,20 @@ func (s *Server) BuildRouters() {
 		api.POST("/refresh", s.routers.Refresh)
 
 		userGroup := api.Group("/users")
-		userGroup.Use(echojwt.WithConfig(echojwt.Config{
-			SigningKey: []byte(s.token),
-		}))
+		userGroup.Use(s.jwtFromCookieMiddleware)
+		// userGroup.Use(echojwt.WithConfig(echojwt.Config{
+		// 	SigningKey: []byte(s.token),
+		// }))
 		{
 			userGroup.GET("/:user_id/is-admin", s.routers.IsAdminPermission)
 			// userGroup.GET("/:email", s.routers.GetUserByEmail, s.adminOnlyMiddleware)
 		}
 
 		mediaGroup := api.Group("/media", s.adminOnlyMiddleware)
-		mediaGroup.Use(echojwt.WithConfig(echojwt.Config{
-			SigningKey: []byte(s.token),
-		}))
+		mediaGroup.Use(s.jwtFromCookieMiddleware)
+		// mediaGroup.Use(echojwt.WithConfig(echojwt.Config{
+		// 	SigningKey: []byte(s.token),
+		// }))
 		{
 			mediaGroup.POST("/upload", s.routers.UploadMedia)
 			mediaGroup.POST("/groups/attach", s.routers.AttachMediaToGroup)
@@ -202,9 +247,10 @@ func (s *Server) BuildRouters() {
 
 		blogGroup := api.Group("/posts")
 		blogGroup.GET("", s.routers.ListPosts)
-		blogGroup.Use(echojwt.WithConfig(echojwt.Config{
-			SigningKey: []byte(s.token),
-		}))
+		blogGroup.Use(s.jwtFromCookieMiddleware)
+		// blogGroup.Use(echojwt.WithConfig(echojwt.Config{
+		// 	SigningKey: []byte(s.token),
+		// }))
 		{
 			blogGroup.POST("", s.routers.CreatePost, s.adminOnlyMiddleware)
 			blogGroup.GET("/:id", s.routers.GetPost)

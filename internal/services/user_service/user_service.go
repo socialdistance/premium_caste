@@ -101,6 +101,8 @@ func (u *UserService) Login(ctx context.Context, c echo.Context, email, password
 		Expires:  time.Now().Add(7 * 24 * time.Hour), // Срок действия refresh-токена
 	})
 
+	token.UserID = user.ID
+
 	return token, nil
 }
 
