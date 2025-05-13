@@ -49,14 +49,16 @@ func New(log *slog.Logger, token string, host, port string, routers *httprouters
 	validate := validator.New()
 	e.Validator = &CustomValidator{validator: validate}
 
-	// e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-	//     AllowOrigins: []string{"*"},
-	//     AllowMethods: []string{echo.GET, echo.PUT, echo.POST, echo.DELETE},
-	// }))
-
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete},
+		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept},
+		AllowCredentials: true,
+		MaxAge:           86400,
+	}))
 	e.Use(session.Middleware(sessions.NewCookieStore([]byte("test"))))
 
-	e.Use(middleware.CORS())
+	// e.Use(middleware.CORS())
 	e.Use(middleware.Recover())
 
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
