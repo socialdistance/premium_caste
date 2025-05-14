@@ -102,11 +102,11 @@ func (r *Routers) Login(c echo.Context) error {
 
 	if err := c.Validate(req); err != nil {
 		response.ErrInvalidRequestFormat.Details = err.Error()
-		log.Warn("invalid format request", slog.String("email", req.Email))
+		log.Warn("invalid format request", slog.String("identifier", req.Identifier))
 		return c.JSON(http.StatusBadRequest, response.ErrInvalidRequestFormat)
 	}
 
-	token, err := r.UserService.Login(c.Request().Context(), c, req.Email, req.Password)
+	token, err := r.UserService.Login(c.Request().Context(), c, req.Identifier, req.Password)
 	if err != nil {
 		response.ErrAuthenticationFailed.Details = err.Error()
 		return c.JSON(http.StatusUnauthorized, response.ErrAuthenticationFailed)
@@ -856,9 +856,9 @@ func (r *Routers) AddMediaGroup(c echo.Context) error {
 // @Param id path string true "UUID поста" format(uuid)
 // @Param relation_type query string false "Тип связи (content, gallery, attachment)"
 // @Success 200 {object} dto.PostMediaGroupsResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 404 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 500 {object} response.ErrorResponse
 // @Security ApiKeyAuth
 // @Router /api/v1/posts/{id}/media-groups [get]
 func (r *Routers) GetPostMediaGroups(c echo.Context) error {

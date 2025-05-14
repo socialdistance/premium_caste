@@ -16,6 +16,7 @@ CREATE TABLE "public"."users" (
 
 ALTER TABLE "public"."users" ADD CONSTRAINT "email" UNIQUE ("email");
 ALTER TABLE "public"."users" ADD CONSTRAINT "phone" UNIQUE ("phone");
+CREATE INDEX idx_users_phone ON users(phone);
 
 -- +goose Down
 DROP TABLE users;

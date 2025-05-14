@@ -12,7 +12,8 @@ import (
 type UserRepository interface {
 	SaveUser(ctx context.Context, user models.User) (uuid.UUID, error)
 	IsAdmin(ctx context.Context, userID uuid.UUID) (bool, error)
-	User(ctx context.Context, email string) (models.User, error)
+	// User(ctx context.Context, email string) (models.User, error)
+	UserByIdentifier(ctx context.Context, identifier string) (models.User, error)
 }
 
 type TokenRepository interface {

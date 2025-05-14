@@ -353,7 +353,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Возвращает список постов с пагинацией и фильтрацией по статусу",
+                "description": "Возвращает список постов с пагинацией и фильтрацией по статусу. http://localhost:8080/api/v1/posts?status=archived\u0026page=1\u0026per_page=1",
                 "produces": [
                     "application/json"
                 ],
@@ -455,6 +455,51 @@ const docTemplate = `{
             }
         },
         "/api/v1/posts/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Возвращает пост по его ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Посты"
+                ],
+                "summary": "Получить пост",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "UUID поста",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.BlogPostResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "put": {
                 "security": [
                     {
@@ -615,6 +660,63 @@ const docTemplate = `{
             }
         },
         "/api/v1/posts/{id}/media-groups": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Возвращает список медиа-групп, привязанных к посту",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Посты"
+                ],
+                "summary": "Получить медиа-группы поста",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "UUID поста",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Тип связи (content, gallery, attachment)",
+                        "name": "relation_type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PostMediaGroupsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -1159,11 +1261,12 @@ const docTemplate = `{
         "request.LoginRequest": {
             "type": "object",
             "required": [
-                "email",
+                "identifier",
                 "password"
             ],
             "properties": {
-                "email": {
+                "identifier": {
+                    "description": "Email    string ` + "`" + `json:\"email,omitempty\"` + "`" + `\nPhone    string ` + "`" + `json:\"phone,omitempty\"` + "`" + `",
                     "type": "string"
                 },
                 "password": {

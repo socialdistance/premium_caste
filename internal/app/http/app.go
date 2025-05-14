@@ -33,13 +33,14 @@ func (cv *CustomValidator) Validate(i interface{}) error {
 }
 
 type Server struct {
-	log        *slog.Logger
-	e          *echo.Echo
-	routers    *httprouters.Routers
-	metricsReg *prometheus.Registry
-	host       string
-	port       string
-	token      string
+	log          *slog.Logger
+	e            *echo.Echo
+	routers      *httprouters.Routers
+	metricsReg   *prometheus.Registry
+	metricServer *http.Server
+	host         string
+	port         string
+	token        string
 }
 
 func New(log *slog.Logger, token string, host, port string, routers *httprouters.Routers) *Server {
@@ -79,14 +80,20 @@ func New(log *slog.Logger, token string, host, port string, routers *httprouters
 	metricsReg := prometheus.NewRegistry()
 	metrics.RegisterMetrics(metricsReg)
 
+	metricsServer := &http.Server{
+		Addr:    ":9090",
+		Handler: promhttp.HandlerFor(metricsReg, promhttp.HandlerOpts{}),
+	}
+
 	return &Server{
-		log:        log,
-		e:          e,
-		routers:    routers,
-		metricsReg: metricsReg,
-		host:       host,
-		port:       port,
-		token:      token,
+		log:          log,
+		e:            e,
+		routers:      routers,
+		metricsReg:   metricsReg,
+		metricServer: metricsServer,
+		host:         host,
+		port:         port,
+		token:        token,
 	}
 }
 
@@ -105,29 +112,17 @@ func (s *Server) Start() error {
 
 	go func() {
 		if err := s.e.Start(fmt.Sprintf(":%s", s.port)); err != nil && err != http.ErrServerClosed {
-			s.log.Error("%s HTTP server stopped", op, slog.Any("error", err))
+			s.log.Error("HTTP server stopped", op, slog.Any("error", err))
 		}
 	}()
 
-	// Запуск метрик сервера
-	metricsServer := &http.Server{
-		Addr:    ":9090",
-		Handler: promhttp.HandlerFor(s.metricsReg, promhttp.HandlerOpts{}),
-	}
-
 	go func() {
-		if err := metricsServer.ListenAndServe(); err != nil {
-			s.log.Error("%s HTTP server stopped", op, slog.Any("error", err))
+		if err := s.metricServer.ListenAndServe(); err != nil {
+			s.log.Error("HTTP server stopped", op, slog.Any("error", err))
 		}
 	}()
 
 	return nil
-
-	// if err := s.e.Start(fmt.Sprintf(":%s", s.port)); err != nil && err != http.ErrServerClosed {
-	// 	return fmt.Errorf("%s server stopped: %w", op, err)
-	// }
-
-	// return nil
 }
 
 func (s *Server) Stop() error {
@@ -140,6 +135,10 @@ func (s *Server) Stop() error {
 
 	if err := s.e.Shutdown(optCtx); err != nil {
 		return fmt.Errorf("%s could not shutdown server gracefuly: %w", op, err)
+	}
+
+	if err := s.metricServer.Shutdown(optCtx); err != nil {
+		return fmt.Errorf("metrics server shutdown failed: %w", err)
 	}
 
 	return nil
@@ -173,7 +172,6 @@ func (s *Server) adminOnlyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 
 func (s *Server) jwtFromCookieMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		// Получаем токен из cookie
 		cookie, err := c.Cookie("access_token")
 		if err != nil {
 			return c.JSON(http.StatusUnauthorized, response.ErrorResponse{
@@ -181,7 +179,6 @@ func (s *Server) jwtFromCookieMiddleware(next echo.HandlerFunc) echo.HandlerFunc
 			})
 		}
 
-		// Валидируем JWT
 		token, err := jwt.Parse(cookie.Value, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -207,7 +204,6 @@ func (s *Server) jwtFromCookieMiddleware(next echo.HandlerFunc) echo.HandlerFunc
 			})
 		}
 
-		// 4. Продолжаем цепочку middleware
 		c.Set("user", token.Claims)
 
 		return next(c)

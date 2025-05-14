@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"premium_caste/internal/domain/models"
@@ -64,10 +65,48 @@ func (r *UserRepo) SaveUser(ctx context.Context, user models.User) (uuid.UUID, e
 	return id, nil
 }
 
-func (r *UserRepo) User(ctx context.Context, email string) (models.User, error) {
-	const op = "repository.user_repository.User"
+// func (r *UserRepo) User(ctx context.Context, email string) (models.User, error) {
+// 	const op = "repository.user_repository.User"
 
-	sql, args, err := r.sb.Select("id", "name", "email", "password", "is_admin", "basket_id").From("users").Where(sq.Eq{"email": email}).ToSql()
+// 	sql, args, err := r.sb.Select("id", "name", "email", "password", "is_admin", "basket_id").From("users").Where(sq.Eq{"email": email}).ToSql()
+// 	if err != nil {
+// 		return models.User{}, fmt.Errorf("%s: can't build sql:%w", op, err)
+// 	}
+
+// 	rows, err := r.db.Query(ctx, sql, args...)
+// 	if err != nil {
+// 		return models.User{}, fmt.Errorf("%s: %w", op, err)
+// 	}
+// 	defer rows.Close()
+
+// 	var user models.User
+
+// 	for rows.Next() {
+// 		err = rows.Scan(&user.ID, &user.Name, &user.Email, &user.Password, &user.IsAdmin, &user.BasketID)
+// 		if errors.Is(err, pgx.ErrNoRows) {
+// 			return models.User{}, fmt.Errorf("%s: %w", op, storage.ErrUserNotFound)
+// 		}
+
+// 		// return models.User{}, fmt.Errorf("%s: %w", op, storage.ErrUserNotFound)
+// 	}
+
+// 	return user, nil
+// }
+
+func (r *UserRepo) UserByIdentifier(ctx context.Context, identifier string) (models.User, error) {
+	const op = "repository.user_repository.UserByIdentifier"
+
+	// Определяем, является ли identifier email'ом или телефоном
+	isEmail := strings.Contains(identifier, "@")
+	condition := sq.Eq{"email": identifier}
+	if !isEmail {
+		condition = sq.Eq{"phone": identifier}
+	}
+
+	sql, args, err := r.sb.Select("id", "name", "email", "phone", "password", "is_admin", "basket_id").
+		From("users").
+		Where(condition).
+		ToSql()
 	if err != nil {
 		return models.User{}, fmt.Errorf("%s: can't build sql:%w", op, err)
 	}
@@ -79,17 +118,16 @@ func (r *UserRepo) User(ctx context.Context, email string) (models.User, error) 
 	defer rows.Close()
 
 	var user models.User
-
-	for rows.Next() {
-		err = rows.Scan(&user.ID, &user.Name, &user.Email, &user.Password, &user.IsAdmin, &user.BasketID)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return models.User{}, fmt.Errorf("%s: %w", op, storage.ErrUserNotFound)
+	if rows.Next() {
+		err = rows.Scan(&user.ID, &user.Name, &user.Email, &user.Phone, &user.Password, &user.IsAdmin, &user.BasketID)
+		if err != nil {
+			return models.User{}, fmt.Errorf("%s: %w", op, err)
 		}
 
-		// return models.User{}, fmt.Errorf("%s: %w", op, storage.ErrUserNotFound)
+		return user, nil
 	}
 
-	return user, nil
+	return models.User{}, fmt.Errorf("%s: %w", op, storage.ErrUserNotFound)
 }
 
 func (r *UserRepo) IsAdmin(ctx context.Context, userID uuid.UUID) (bool, error) {

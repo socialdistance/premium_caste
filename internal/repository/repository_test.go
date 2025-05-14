@@ -444,7 +444,7 @@ func TestUserRepository_User(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("existing user", func(t *testing.T) {
-		user, err := repo.User(testCtx, testUser.Email)
+		user, err := repo.UserByIdentifier(testCtx, testUser.Email)
 		require.NoError(t, err)
 
 		assert.Equal(t, testUser.ID, user.ID)

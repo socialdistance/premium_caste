@@ -29,7 +29,7 @@ func (m *MockUserRepository) SaveUser(ctx context.Context, user models.User) (uu
 	return args.Get(0).(uuid.UUID), args.Error(1)
 }
 
-func (m *MockUserRepository) User(ctx context.Context, email string) (models.User, error) {
+func (m *MockUserRepository) UserByIdentifier(ctx context.Context, email string) (models.User, error) {
 	args := m.Called(ctx, email)
 	return args.Get(0).(models.User), args.Error(1)
 }
