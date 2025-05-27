@@ -149,3 +149,45 @@ func (r *UserRepo) IsAdmin(ctx context.Context, userID uuid.UUID) (bool, error) 
 
 	return isAdmin, nil
 }
+
+func (r *UserRepo) GetUserById(ctx context.Context, userID uuid.UUID) (*models.User, error) {
+	const op = "repository.user_repository.GetUserById"
+
+	sql, args, err := r.sb.
+		Select(
+			"name",
+			"email",
+			"phone",
+			"is_admin",
+			"basket_id",
+			"registration_date",
+			"last_login",
+		).
+		From("users").
+		Where(sq.Eq{"id": userID}).
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("%s: can't build sql: %w", op, err)
+	}
+
+	var user models.User
+
+	// Выполняем запрос и сканируем результат
+	err = r.db.QueryRow(ctx, sql, args...).Scan(
+		&user.Name,
+		&user.Email,
+		&user.Phone,
+		&user.IsAdmin,
+		&user.BasketID,
+		&user.RegistrationDate,
+		&user.LastLogin,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("%s: %w", op, storage.ErrUserNotFound)
+		}
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return &user, nil
+}

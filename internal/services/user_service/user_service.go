@@ -106,68 +106,6 @@ func (u *UserService) Login(ctx context.Context, c echo.Context, identifier, pas
 	return token, nil
 }
 
-// func (u *UserService) Login(ctx context.Context, c echo.Context, email, password string) (*models.TokenPair, error) {
-// 	const op = "user_service.Login"
-
-// 	log := u.log.With(
-// 		slog.String("op", op),
-// 		slog.String("username", email),
-// 	)
-
-// 	log.Info("attempting to login user")
-
-// 	user, err := u.repo.User(ctx, email)
-// 	if err != nil {
-// 		if errors.Is(err, storage.ErrUserNotFound) {
-// 			u.log.Warn("user not found", sl.Err(err))
-
-// 			return nil, fmt.Errorf("%s: %w", op, ErrInvalidCredentials)
-// 		}
-// 		u.log.Error("failed to get user", sl.Err(err))
-
-// 		return nil, fmt.Errorf("%s: %w", op, err)
-// 	}
-
-// 	if err := bcrypt.CompareHashAndPassword(user.Password, []byte(password)); err != nil {
-// 		u.log.Info("invalid credentials", sl.Err(err))
-
-// 		return nil, fmt.Errorf("%s: %w", op, ErrInvalidCredentials)
-// 	}
-
-// 	log.Info("user logged in successfully")
-
-// 	token, err := u.authService.GenerateTokens(user)
-// 	if err != nil {
-// 		u.log.Error("failed to generate token", sl.Err(err))
-
-// 		return nil, fmt.Errorf("%s: %w", op, err)
-// 	}
-
-// 	http.SetCookie(c.Response().Writer, &http.Cookie{
-// 		Name:     "access_token",
-// 		Value:    token.AccessToken,
-// 		Path:     "/",
-// 		HttpOnly: true,
-// 		Secure:   true,
-// 		SameSite: http.SameSiteStrictMode,
-// 		Expires:  time.Now().Add(24 * time.Hour),
-// 	})
-
-// 	http.SetCookie(c.Response().Writer, &http.Cookie{
-// 		Name:     "refresh_token",
-// 		Value:    token.RefreshToken,
-// 		Path:     "/api/v1/refresh",
-// 		HttpOnly: true,
-// 		Secure:   true,
-// 		SameSite: http.SameSiteStrictMode,
-// 		Expires:  time.Now().Add(7 * 24 * time.Hour),
-// 	})
-
-// 	token.UserID = user.ID
-
-// 	return token, nil
-// }
-
 func (u *UserService) RegisterNewUser(ctx context.Context, input dto.UserRegisterInput) (uuid.UUID, error) {
 	const op = "user_service.RegisterNewUser"
 

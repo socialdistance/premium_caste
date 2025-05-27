@@ -110,6 +110,7 @@ func applyMigrations(pool *pgxpool.Pool) error {
 			password TEXT NOT NULL,
 			is_admin BOOLEAN,
 			basket_id UUID,
+			registration_date TIMESTAMPTZ NOT NULL DEFAULT NOW(), 
 			last_login TIMESTAMP WITH TIME ZONE
 		);
 
@@ -429,18 +430,20 @@ func TestUserRepository_User(t *testing.T) {
 	repo := repository.NewUserRepository(pool)
 
 	testUser := models.User{
-		ID:       uuid.New(),
-		Name:     "Existing User",
-		Email:    "existing@example.com",
-		Password: []byte("hashedpassword"),
-		IsAdmin:  false,
-		BasketID: uuid.New(),
+		ID:               uuid.New(),
+		Name:             "Existing User",
+		Email:            "existing@example.com",
+		Phone:            "+123456789",
+		Password:         []byte("hashedpassword"),
+		IsAdmin:          false,
+		BasketID:         uuid.New(),
+		RegistrationDate: time.Now(),
+		LastLogin:        time.Now(),
 	}
 
 	_, err := pool.Exec(testCtx,
-		"INSERT INTO users (id, name, email, password, is_admin, basket_id) VALUES ($1, $2, $3, $4, $5, $6)",
-		testUser.ID, testUser.Name, testUser.Email, testUser.Password, testUser.IsAdmin, testUser.BasketID,
-	)
+		"INSERT INTO users (id, name, email, phone, password, is_admin, basket_id, registration_date, last_login) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+		testUser.ID, testUser.Name, testUser.Email, testUser.Phone, testUser.Password, testUser.IsAdmin, testUser.BasketID, testUser.RegistrationDate, testUser.LastLogin)
 	require.NoError(t, err)
 
 	t.Run("existing user", func(t *testing.T) {
@@ -452,6 +455,16 @@ func TestUserRepository_User(t *testing.T) {
 		assert.Equal(t, testUser.Email, user.Email)
 		assert.Equal(t, testUser.Password, user.Password)
 		assert.Equal(t, testUser.IsAdmin, user.IsAdmin)
+		assert.Equal(t, testUser.BasketID, user.BasketID)
+	})
+
+	t.Run("get user by id", func(t *testing.T) {
+		user, err := repo.GetUserById(testCtx, testUser.ID)
+		require.NoError(t, err)
+
+		assert.Equal(t, testUser.ID, user.ID)
+		assert.Equal(t, testUser.Name, user.Name)
+		assert.Equal(t, testUser.Email, user.Email)
 		assert.Equal(t, testUser.BasketID, user.BasketID)
 	})
 

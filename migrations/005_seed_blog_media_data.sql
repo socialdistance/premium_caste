@@ -79,7 +79,7 @@ VALUES
     (
         'c5be2270-d863-4a05-9165-44843ea166bc', 
         '2025-04-28 10:00:00+03',
-        'b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', -- Пример ID владельца (замените на реальный)
+        'b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a22',
         'Галерея из экспедиции'
     );
 -- 4. Связи фото с группами
@@ -100,21 +100,34 @@ VALUES
 
 -- +goose Down
 
--- Получить все медиа для поста "Путешествие по Камчатке"
 -- SELECT 
---     bp.title AS post_title,
---     mg.name AS group_name,
---     m.file_path,
---     m.metadata->>'type' AS media_type
+--     m.id,
+--     m.media_type,
+--     m.original_filename,
+--     m.storage_path,
+--     m.width,
+--     m.height,
+--     m.is_public,
+--     CASE 
+--         WHEN m.id = bp.featured_image_id THEN 'featured'
+--         ELSE pmg.relation_type
+--     END AS media_role,
+--     mgi.position AS gallery_position
 -- FROM 
 --     blog_posts bp
--- JOIN 
+-- LEFT JOIN 
 --     post_media_groups pmg ON bp.id = pmg.post_id
--- JOIN 
+-- LEFT JOIN 
 --     media_groups mg ON pmg.group_id = mg.id
--- JOIN 
+-- LEFT JOIN 
 --     media_group_items mgi ON mg.id = mgi.group_id
--- JOIN 
---     media m ON mgi.media_id = m.id
+-- LEFT JOIN 
+--     media m ON mgi.media_id = m.id OR m.id = bp.featured_image_id
 -- WHERE 
---     bp.id = 'f8a1e2c1-b12d-4a2a-3d45-5d8a1e2c1b12';
+--     bp.id = 'f8a1e2c1-b12d-4a2a-3d45-5d8a1e2c1b12'  -- Укажите нужный ID поста
+-- ORDER BY 
+--     CASE 
+--         WHEN m.id = bp.featured_image_id THEN 0  -- Главное изображение первым
+--         ELSE 1
+--     END,
+--     mgi.position;

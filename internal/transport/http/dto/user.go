@@ -1,8 +1,6 @@
 package dto
 
 import (
-	"premium_caste/internal/domain/models"
-
 	"github.com/google/uuid"
 )
 
@@ -15,13 +13,13 @@ type UserRegisterInput struct {
 	BasketID uuid.UUID `json:"-" swaggertype:"string" format:"uuid"`
 }
 
-func (input UserRegisterInput) ToDomain(passwordHash []byte) *models.User {
-	return &models.User{
-		Name:     input.Name,
-		Email:    input.Email,
-		Phone:    input.Phone,
-		Password: passwordHash,
-		IsAdmin:  input.IsAdmin,
-		BasketID: uuid.New(),
-	}
-}
+// func (input UserRegisterInput) ToDomain(passwordHash []byte) *models.User {
+// 	return &models.User{
+// 		Name:     input.Name,
+// 		Email:    input.Email,
+// 		Phone:    input.Phone,
+// 		Password: passwordHash,
+// 		IsAdmin:  input.IsAdmin,
+// 		BasketID: uuid.New(),
+// 	}
+// }
