@@ -150,7 +150,7 @@ func (r *UserRepo) IsAdmin(ctx context.Context, userID uuid.UUID) (bool, error) 
 	return isAdmin, nil
 }
 
-func (r *UserRepo) GetUserById(ctx context.Context, userID uuid.UUID) (*models.User, error) {
+func (r *UserRepo) GetUserById(ctx context.Context, userID uuid.UUID) (models.User, error) {
 	const op = "repository.user_repository.GetUserById"
 
 	sql, args, err := r.sb.
@@ -167,7 +167,7 @@ func (r *UserRepo) GetUserById(ctx context.Context, userID uuid.UUID) (*models.U
 		Where(sq.Eq{"id": userID}).
 		ToSql()
 	if err != nil {
-		return nil, fmt.Errorf("%s: can't build sql: %w", op, err)
+		return models.User{}, fmt.Errorf("%s: can't build sql: %w", op, err)
 	}
 
 	var user models.User
@@ -184,10 +184,10 @@ func (r *UserRepo) GetUserById(ctx context.Context, userID uuid.UUID) (*models.U
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("%s: %w", op, storage.ErrUserNotFound)
+			return models.User{}, fmt.Errorf("%s: %w", op, storage.ErrUserNotFound)
 		}
-		return nil, fmt.Errorf("%s: %w", op, err)
+		return models.User{}, fmt.Errorf("%s: %w", op, err)
 	}
 
-	return &user, nil
+	return user, nil
 }

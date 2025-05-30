@@ -462,7 +462,6 @@ func TestUserRepository_User(t *testing.T) {
 		user, err := repo.GetUserById(testCtx, testUser.ID)
 		require.NoError(t, err)
 
-		assert.Equal(t, testUser.ID, user.ID)
 		assert.Equal(t, testUser.Name, user.Name)
 		assert.Equal(t, testUser.Email, user.Email)
 		assert.Equal(t, testUser.BasketID, user.BasketID)

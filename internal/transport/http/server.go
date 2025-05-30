@@ -25,6 +25,7 @@ type UserService interface {
 	Login(ctx context.Context, c echo.Context, email, password string) (*models.TokenPair, error)
 	RegisterNewUser(ctx context.Context, input dto.UserRegisterInput) (uuid.UUID, error)
 	IsAdmin(ctx context.Context, userID uuid.UUID) (bool, error)
+	GetUserById(ctx context.Context, userID uuid.UUID) (models.User, error)
 }
 
 type MediaService interface {
@@ -247,6 +248,49 @@ func (r *Routers) IsAdminPermission(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]bool{
 		"is_admin": isAdmin,
 	})
+}
+
+// GetUserById godoc
+// @Summary Получение информации о пользователе
+// @Description Возвращает полную информацию о пользователе по его UUID
+// @Tags Пользователи
+// @Accept json
+// @Produce json
+// @Param user_id body string true "UUID пользователя" format(uuid) example("a8a8a8a8-a8a8-a8a8-a8a8-a8a8a8a8a8a8")
+// @Success 200 {object} models.User "Успешно полученные данные пользователя"
+// @Failure 400 {object} response.ErrorResponse "Некорректный UUID пользователя"
+// @Failure 404 {object} response.ErrorResponse "Пользователь не найден"
+// @Failure 500 {object} response.ErrorResponse "Внутренняя ошибка сервера"
+// @Security ApiKeyAuth
+// @Router /api/v1/users/get [post]
+func (r *Routers) GetUserById(c echo.Context) error {
+	const op = "http.routers.GetUserById"
+
+	log := r.log.With(
+		slog.String("op", op),
+	)
+
+	var req struct {
+		UserID uuid.UUID `json:"user_id"`
+	}
+
+	if err := c.Bind(&req); err != nil {
+		log.Error("validation bind", sl.Err(err))
+		return c.JSON(http.StatusInternalServerError, response.ErrorResponse{
+			Error: "validation bind",
+		})
+	}
+
+	user, err := r.UserService.GetUserById(c.Request().Context(), req.UserID)
+	if err != nil {
+		log.Error("error get user", sl.Err(err))
+		return c.JSON(http.StatusInternalServerError, response.ErrorResponse{
+			Error: "failed get user",
+		})
+
+	}
+
+	return c.JSON(http.StatusOK, user)
 }
 
 // UploadMedia godoc

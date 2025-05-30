@@ -14,6 +14,7 @@ type UserRepository interface {
 	IsAdmin(ctx context.Context, userID uuid.UUID) (bool, error)
 	// User(ctx context.Context, email string) (models.User, error)
 	UserByIdentifier(ctx context.Context, identifier string) (models.User, error)
+	GetUserById(ctx context.Context, userID uuid.UUID) (models.User, error)
 }
 
 type TokenRepository interface {

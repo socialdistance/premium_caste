@@ -135,7 +135,7 @@ func (u *UserService) RegisterNewUser(ctx context.Context, input dto.UserRegiste
 	id, err := u.repo.SaveUser(ctx, user)
 	if err != nil {
 		if errors.Is(err, ErrUserExist) {
-			log.Warn("user already exist", slog.Any("error", err.Error()))
+			log.Warn("user already exist", sl.Err(err))
 
 			return uuid.Nil, fmt.Errorf("%s: %w", op, ErrUserExist)
 		}
@@ -162,10 +162,32 @@ func (u *UserService) IsAdmin(ctx context.Context, userID uuid.UUID) (bool, erro
 
 	isAdmin, err := u.repo.IsAdmin(ctx, userID)
 	if err != nil {
+		log.Error("failed check is admin permission", sl.Err(err))
+
 		return false, fmt.Errorf("%s: %w", op, err)
 	}
 
 	log.Info("checked if user is admin", slog.Bool("is_admin", isAdmin))
 
 	return isAdmin, nil
+}
+
+func (u *UserService) GetUserById(ctx context.Context, userID uuid.UUID) (models.User, error) {
+	const op = "user_service.GetUserById"
+
+	log := u.log.With(
+		slog.String("op", op),
+		slog.Any("user_id", userID),
+	)
+
+	log.Info("get user info by id")
+
+	user, err := u.repo.GetUserById(ctx, userID)
+	if err != nil {
+		log.Error("failed to get user", sl.Err(err))
+
+		return models.User{}, fmt.Errorf("%s:%w", op, err)
+	}
+
+	return user, nil
 }

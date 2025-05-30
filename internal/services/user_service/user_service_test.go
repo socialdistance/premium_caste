@@ -39,6 +39,11 @@ func (m *MockUserRepository) IsAdmin(ctx context.Context, userID uuid.UUID) (boo
 	return args.Bool(0), args.Error(1)
 }
 
+func (m *MockUserRepository) GetUserById(ctx context.Context, userID uuid.UUID) (models.User, error) {
+	args := m.Called(ctx, userID)
+	return args.Get(0).(models.User), args.Error(1)
+}
+
 type MockTokenService struct {
 	mock.Mock
 }

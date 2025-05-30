@@ -228,7 +228,7 @@ func (s *Server) BuildRouters() {
 		// }))
 		{
 			userGroup.GET("/:user_id/is-admin", s.routers.IsAdminPermission)
-			// userGroup.GET("/:email", s.routers.GetUserByEmail, s.adminOnlyMiddleware)
+			userGroup.POST("/user_id", s.routers.GetUserById)
 		}
 
 		mediaGroup := api.Group("/media", s.adminOnlyMiddleware)

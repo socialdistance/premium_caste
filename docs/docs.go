@@ -900,6 +900,65 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/users/get": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Возвращает полную информацию о пользователе по его UUID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Пользователи"
+                ],
+                "summary": "Получение информации о пользователе",
+                "parameters": [
+                    {
+                        "format": "uuid",
+                        "example": "\"a8a8a8a8-a8a8-a8a8-a8a8-a8a8a8a8a8a8\"",
+                        "description": "UUID пользователя",
+                        "name": "user_id",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешно полученные данные пользователя",
+                        "schema": {
+                            "$ref": "#/definitions/models.User"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный UUID пользователя",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Пользователь не найден",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/users/{user_id}/is-admin": {
             "get": {
                 "security": [
@@ -1257,6 +1316,41 @@ const docTemplate = `{
         "models.Metadata": {
             "type": "object",
             "additionalProperties": true
+        },
+        "models.User": {
+            "type": "object",
+            "properties": {
+                "basket_id": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_admin": {
+                    "type": "boolean"
+                },
+                "last_login": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "registration_date": {
+                    "type": "string"
+                }
+            }
         },
         "request.LoginRequest": {
             "type": "object",

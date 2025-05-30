@@ -208,6 +208,29 @@ definitions:
   models.Metadata:
     additionalProperties: true
     type: object
+  models.User:
+    properties:
+      basket_id:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      is_admin:
+        type: boolean
+      last_login:
+        type: string
+      name:
+        type: string
+      password:
+        items:
+          type: integer
+        type: array
+      phone:
+        type: string
+      registration_date:
+        type: string
+    type: object
   request.LoginRequest:
     properties:
       identifier:
@@ -850,4 +873,42 @@ paths:
       summary: Проверка административного статуса пользователя
       tags:
       - Users
+  /api/v1/users/get:
+    post:
+      consumes:
+      - application/json
+      description: Возвращает полную информацию о пользователе по его UUID
+      parameters:
+      - description: UUID пользователя
+        example: '"a8a8a8a8-a8a8-a8a8-a8a8-a8a8a8a8a8a8"'
+        format: uuid
+        in: body
+        name: user_id
+        required: true
+        schema:
+          type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешно полученные данные пользователя
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Некорректный UUID пользователя
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Пользователь не найден
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Получение информации о пользователе
+      tags:
+      - Пользователи
 swagger: "2.0"
