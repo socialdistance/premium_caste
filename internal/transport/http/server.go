@@ -33,6 +33,7 @@ type MediaService interface {
 	AttachMediaToGroup(ctx context.Context, groupID uuid.UUID, mediaID uuid.UUID) error
 	AttachMedia(ctx context.Context, ownerID uuid.UUID, description string) error
 	ListGroupMedia(ctx context.Context, groupID uuid.UUID) ([]models.Media, error)
+	GetAllImages(ctx context.Context) ([]models.Media, error)
 }
 
 type AuthService interface {
@@ -262,7 +263,7 @@ func (r *Routers) IsAdminPermission(c echo.Context) error {
 // @Failure 404 {object} response.ErrorResponse "Пользователь не найден"
 // @Failure 500 {object} response.ErrorResponse "Внутренняя ошибка сервера"
 // @Security ApiKeyAuth
-// @Router /api/v1/users/get [post]
+// @Router /api/v1/users/users_id [post]
 func (r *Routers) GetUserById(c echo.Context) error {
 	const op = "http.routers.GetUserById"
 
@@ -542,6 +543,62 @@ func (r *Routers) ListGroupMedia(c echo.Context) error {
 		},
 	}
 
+	return c.JSON(http.StatusOK, response)
+}
+
+// GetAllImages godoc
+// @Summary Получить все изображения
+// @Description Возвращает список всех загруженных изображений с метаданными
+// @Tags Медиа
+// @Accept  json
+// @Produce  json
+// @Success 200 {object} map[string]interface{} "Успешный ответ"
+// @SuccessExample {json} Успешный ответ:
+//
+//	{
+//	    "data": [
+//	        {
+//	            "id": "550e8400-e29b-41d4-a716-446655440000",
+//	            "uploader_id": "550e8400-e29b-41d4-a716-446655440000",
+//	            "created_at": "2025-06-06T11:08:12Z",
+//	            "original_filename": "nature.jpg",
+//	            "storage_path": "images/2025/06/550e8400-e29b-41d4-a716-446655440000.jpg",
+//	            "file_size": 102400,
+//	            "mime_type": "image/jpeg",
+//	            "width": 1920,
+//	            "height": 1080,
+//	            "is_public": true,
+//	            "metadata": {}
+//	        }
+//	    ],
+//	    "meta": {
+//	        "count": 1
+//	    }
+//	}
+//
+// @Failure 500 {object} response.ErrorResponse "Внутренняя ошибка сервера"
+// @Router /api/images [get]
+func (r *Routers) GetAllImages(c echo.Context) error {
+	const op = "http.routers.GetAllImages"
+
+	log := r.log.With(
+		slog.String("op", op),
+	)
+
+	media, err := r.MediaService.GetAllImages(c.Request().Context())
+	if err != nil {
+		log.Error("failed get images", sl.Err(err))
+		return c.JSON(http.StatusInternalServerError, response.ErrorResponse{
+			Error: err.Error(),
+		})
+	}
+
+	response := map[string]interface{}{
+		"data": media,
+		"meta": map[string]interface{}{
+			"count": len(media),
+		},
+	}
 	return c.JSON(http.StatusOK, response)
 }
 

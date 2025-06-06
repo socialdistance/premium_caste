@@ -59,6 +59,14 @@ func (m *MockMediaRepository) CreateMedia(ctx context.Context, media *models.Med
 	return args.Get(0).(*models.Media), args.Error(1)
 }
 
+func (m *MockMediaRepository) GetAllImages(ctx context.Context) ([]models.Media, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.Media), args.Error(1)
+}
+
 type MockFileStorage struct {
 	mock.Mock
 }

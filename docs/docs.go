@@ -15,6 +15,36 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/images": {
+            "get": {
+                "description": "Возвращает список всех загруженных изображений с метаданными",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Медиа"
+                ],
+                "summary": "Получить все изображения",
+                "responses": {
+                    "200": {
+                        "description": "Успешный ответ",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/login": {
             "post": {
                 "description": "Вход в систему по email и паролю. Возвращает JWT-токен.",
@@ -900,7 +930,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/users/get": {
+        "/api/v1/users/users_id": {
             "post": {
                 "security": [
                     {

@@ -178,3 +178,20 @@ func (s *MediaService) cleanupFile(ctx context.Context, path string, log *slog.L
 	}
 	return nil
 }
+
+// TODO: добавить кеш
+func (s *MediaService) GetAllImages(ctx context.Context) ([]models.Media, error) {
+	const op = "media_service.GetAllImages"
+
+	log := s.log.With(
+		"op", op,
+	)
+
+	media, err := s.repo.GetAllImages(ctx)
+	if err != nil {
+		log.Error("failed get media: %s %w", op, sl.Err(err))
+		return []models.Media{}, fmt.Errorf("failed get media list: %s %s", op, sl.Err(err))
+	}
+
+	return media, nil
+}

@@ -265,6 +265,26 @@ definitions:
 info:
   contact: {}
 paths:
+  /api/images:
+    get:
+      consumes:
+      - application/json
+      description: Возвращает список всех загруженных изображений с метаданными
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешный ответ
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Получить все изображения
+      tags:
+      - Медиа
   /api/v1/login:
     post:
       consumes:
@@ -873,7 +893,7 @@ paths:
       summary: Проверка административного статуса пользователя
       tags:
       - Users
-  /api/v1/users/get:
+  /api/v1/users/users_id:
     post:
       consumes:
       - application/json
