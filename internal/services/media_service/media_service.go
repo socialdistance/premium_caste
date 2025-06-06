@@ -115,7 +115,7 @@ func (s *MediaService) AttachMediaToGroup(ctx context.Context, groupID uuid.UUID
 	return nil
 }
 
-func (s *MediaService) AttachMedia(ctx context.Context, ownerID uuid.UUID, description string) error {
+func (s *MediaService) AttachMedia(ctx context.Context, ownerID uuid.UUID, description string) (uuid.UUID, error) {
 	const op = "media_service.AttachMedia"
 
 	log := s.log.With(
@@ -126,12 +126,13 @@ func (s *MediaService) AttachMedia(ctx context.Context, ownerID uuid.UUID, descr
 
 	if ownerID == uuid.Nil {
 		log.Info("ownerID is required", "op", op)
-		return fmt.Errorf("%s: ownerID is required", op)
+		return uuid.Nil, fmt.Errorf("%s: ownerID is required", op)
 	}
 
-	if err := s.repo.AddMediaGroup(ctx, ownerID, description); err != nil {
+	groupID, err := s.repo.AddMediaGroup(ctx, ownerID, description)
+	if err != nil {
 		log.Error("%s: failed to attach media: %s", op, sl.Err(err))
-		return fmt.Errorf("%s: failed to attach media: %w", op, err)
+		return uuid.Nil, fmt.Errorf("%s: failed to attach media: %w", op, err)
 	}
 
 	log.Debug("media attached to group",
@@ -140,7 +141,7 @@ func (s *MediaService) AttachMedia(ctx context.Context, ownerID uuid.UUID, descr
 		"description", description,
 	)
 
-	return nil
+	return groupID, nil
 }
 
 func (s *MediaService) ListGroupMedia(ctx context.Context, groupID uuid.UUID) ([]models.Media, error) {

@@ -31,7 +31,7 @@ type UserService interface {
 type MediaService interface {
 	UploadMedia(ctx context.Context, input dto.MediaUploadInput) (*models.Media, error)
 	AttachMediaToGroup(ctx context.Context, groupID uuid.UUID, mediaID uuid.UUID) error
-	AttachMedia(ctx context.Context, ownerID uuid.UUID, description string) error
+	AttachMedia(ctx context.Context, ownerID uuid.UUID, description string) (uuid.UUID, error)
 	ListGroupMedia(ctx context.Context, groupID uuid.UUID) ([]models.Media, error)
 	GetAllImages(ctx context.Context) ([]models.Media, error)
 }
@@ -471,17 +471,18 @@ func (r *Routers) CreateMediaGroup(c echo.Context) error {
 		})
 	}
 
-	if err := r.MediaService.AttachMedia(
-		c.Request().Context(),
-		ownerID,
-		req.Description,
-	); err != nil {
+	groupID, err := r.MediaService.AttachMedia(c.Request().Context(), ownerID, req.Description)
+	if err != nil {
 		return c.JSON(http.StatusInternalServerError, response.ErrorResponse{
 			Error: err.Error(),
 		})
 	}
 
-	return c.NoContent(http.StatusCreated)
+	response := map[string]interface{}{
+		"data": groupID,
+	}
+
+	return c.JSON(http.StatusOK, response)
 }
 
 // ListGroupMedia godoc

@@ -89,7 +89,7 @@ func (r *MediaRepo) CreateMedia(ctx context.Context, media *models.Media) (*mode
 	return &createdMedia, nil
 }
 
-func (r *MediaRepo) AddMediaGroup(ctx context.Context, ownerID uuid.UUID, description string) error {
+func (r *MediaRepo) AddMediaGroup(ctx context.Context, ownerID uuid.UUID, description string) (uuid.UUID, error) {
 	const op = "repository.media_repository.AddMedia"
 
 	query, args, err := r.sb.Insert("media_groups").
@@ -98,17 +98,19 @@ func (r *MediaRepo) AddMediaGroup(ctx context.Context, ownerID uuid.UUID, descri
 			ownerID,
 			description,
 		).
+		Suffix("RETURNING id"). // Добавляем возврат ID созданной записи
 		ToSql()
 	if err != nil {
-		return fmt.Errorf("failed to build query: %s %w", op, err)
+		return uuid.Nil, fmt.Errorf("failed to build query: %s %w", op, err)
 	}
 
-	_, err = r.db.Exec(ctx, query, args...)
+	var groupID uuid.UUID
+	err = r.db.QueryRow(ctx, query, args...).Scan(&groupID)
 	if err != nil {
-		return fmt.Errorf("failed to add media to group:%s %w", op, err)
+		return uuid.Nil, fmt.Errorf("%s failed to create media group: %w", op, err)
 	}
 
-	return nil
+	return groupID, nil
 }
 
 func (r *MediaRepo) UpdateMedia(ctx context.Context, media *models.Media) error {
@@ -301,6 +303,7 @@ func (r *MediaRepo) GetAllImages(ctx context.Context) ([]models.Media, error) {
 			"original_filename",
 			"storage_path",
 			"file_size",
+			"mime_type",
 			"width",
 			"height",
 			"is_public",

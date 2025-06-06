@@ -225,7 +225,7 @@ func TestMediaRepo_GroupOperations(t *testing.T) {
 	})
 
 	t.Run("create media group", func(t *testing.T) {
-		err := repo.AddMediaGroup(testCtx, ownerID, "test group")
+		_, err := repo.AddMediaGroup(testCtx, ownerID, "test group")
 		require.NoError(t, err)
 
 		var count int

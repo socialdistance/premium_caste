@@ -31,9 +31,9 @@ func (m *MockMediaRepository) GetMediaByGroupID(ctx context.Context, groupID uui
 	return args.Get(0).([]models.Media), args.Error(1)
 }
 
-func (m *MockMediaRepository) AddMediaGroup(ctx context.Context, ownerID uuid.UUID, description string) error {
+func (m *MockMediaRepository) AddMediaGroup(ctx context.Context, ownerID uuid.UUID, description string) (uuid.UUID, error) {
 	args := m.Called(ctx, ownerID, description)
-	return args.Error(0)
+	return args.Get(0).(uuid.UUID), args.Error(1)
 }
 
 func (m *MockMediaRepository) AddMediaGroupItems(ctx context.Context, groupID, mediaID uuid.UUID) error {
@@ -247,14 +247,14 @@ func TestAttachMedia(t *testing.T) {
 		mockRepo.On("AddMediaGroup", mock.Anything, validOwnerID, description).
 			Return(nil)
 
-		err := service.AttachMedia(context.Background(), validOwnerID, description)
+		_, err := service.AttachMedia(context.Background(), validOwnerID, description)
 
 		assert.NoError(t, err)
 		mockRepo.AssertExpectations(t)
 	})
 
 	t.Run("Validation error, empty ownerID", func(t *testing.T) {
-		err := service.AttachMedia(context.Background(), uuid.Nil, description)
+		_, err := service.AttachMedia(context.Background(), uuid.Nil, description)
 
 		assert.ErrorContains(t, err, "ownerID is required")
 		mockRepo.AssertNotCalled(t, "AddMediaGroup")
