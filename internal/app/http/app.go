@@ -246,13 +246,13 @@ func (s *Server) BuildRouters() {
 
 		blogGroup := api.Group("/posts")
 		blogGroup.GET("", s.routers.ListPosts)
+		blogGroup.GET("/:id", s.routers.GetPost)
 		blogGroup.Use(s.jwtFromCookieMiddleware)
 		// blogGroup.Use(echojwt.WithConfig(echojwt.Config{
 		// 	SigningKey: []byte(s.token),
 		// }))
 		{
 			blogGroup.POST("", s.routers.CreatePost, s.adminOnlyMiddleware)
-			blogGroup.GET("/:id", s.routers.GetPost)
 			blogGroup.PUT("/:id", s.routers.UpdatePost, s.adminOnlyMiddleware)
 			blogGroup.DELETE("/:id", s.routers.DeletePost, s.adminOnlyMiddleware)
 			blogGroup.PATCH("/:id/publish", s.routers.PublishPost, s.adminOnlyMiddleware)
