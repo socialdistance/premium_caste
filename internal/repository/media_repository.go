@@ -303,7 +303,6 @@ func (r *MediaRepo) GetAllImages(ctx context.Context) ([]models.Media, error) {
 			"original_filename",
 			"storage_path",
 			"file_size",
-			"mime_type",
 			"width",
 			"height",
 			"is_public",
