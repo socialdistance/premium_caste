@@ -239,9 +239,18 @@ func (b *BlogRepo) GetBlogPosts(
 	}
 
 	// Строим базовый запрос
+	// queryBuilder := b.sb.Select(
+	// 	"id", "title", "slug", "excerpt", "content", "featured_image_id", "author_id", "status", "published_at", "created_at", "updated_at",
+	// ).From("blog_posts")
+
 	queryBuilder := b.sb.Select(
-		"id", "title", "slug", "excerpt", "content", "featured_image_id", "author_id", "status", "published_at", "created_at", "updated_at",
-	).From("blog_posts")
+		"bp.id", "bp.title", "bp.slug", "bp.excerpt", "bp.content",
+		"bp.featured_image_id",
+		"(SELECT storage_path FROM media WHERE id = bp.featured_image_id) AS featured_image_path",
+		"bp.author_id", "bp.status",
+		"bp.published_at", "bp.created_at", "bp.updated_at",
+	).
+		From("blog_posts bp")
 
 	// Применяем фильтр по статусу
 	switch statusFilter {
@@ -289,6 +298,7 @@ func (b *BlogRepo) GetBlogPosts(
 			&post.Excerpt,
 			&post.Content,
 			&post.FeaturedImageID,
+			&post.FeaturedImagePath,
 			&post.AuthorID,
 			&post.Status,
 			&post.PublishedAt,
