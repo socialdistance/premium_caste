@@ -389,17 +389,18 @@ func (s *BlogService) toPostResponse(ctx context.Context, postID uuid.UUID) (*dt
 
 func (s *BlogService) mapToPostResponse(post *models.BlogPost) *dto.BlogPostResponse {
 	return &dto.BlogPostResponse{
-		ID:              post.ID,
-		Title:           post.Title,
-		Slug:            post.Slug,
-		Excerpt:         post.Excerpt,
-		Content:         post.Content,
-		FeaturedImageID: post.FeaturedImageID,
-		AuthorID:        post.AuthorID,
-		Status:          post.Status,
-		PublishedAt:     post.PublishedAt,
-		CreatedAt:       post.CreatedAt,
-		UpdatedAt:       post.UpdatedAt,
-		Metadata:        post.Metadata,
+		ID:                post.ID,
+		Title:             post.Title,
+		Slug:              post.Slug,
+		Excerpt:           post.Excerpt,
+		Content:           post.Content,
+		FeaturedImageID:   post.FeaturedImageID,
+		FeaturedImagePath: post.FeaturedImagePath,
+		AuthorID:          post.AuthorID,
+		Status:            post.Status,
+		PublishedAt:       post.PublishedAt,
+		CreatedAt:         post.CreatedAt,
+		UpdatedAt:         post.UpdatedAt,
+		Metadata:          post.Metadata,
 	}
 }

@@ -164,14 +164,25 @@ func (b *BlogRepo) SoftDeleteBlogPost(ctx context.Context, postID uuid.UUID) err
 func (b *BlogRepo) GetBlogPostByID(ctx context.Context, postID uuid.UUID) (*models.BlogPost, error) {
 	const op = "repository.blog_repository.GetBlogPostByID"
 
+	// queryBuilder := b.sb.Select(
+	// 	"id", "title", "slug", "excerpt", "content",
+	// 	"featured_image_id", "author_id", "status",
+	// 	"published_at", "created_at", "updated_at",
+	// 	"metadata",
+	// ).
+	// 	From("blog_posts").
+	// 	Where(sq.Eq{"id": postID})
+
 	queryBuilder := b.sb.Select(
-		"id", "title", "slug", "excerpt", "content",
-		"featured_image_id", "author_id", "status",
-		"published_at", "created_at", "updated_at",
-		"metadata",
+		"bp.id", "bp.title", "bp.slug", "bp.excerpt", "bp.content",
+		"bp.featured_image_id",
+		"(SELECT storage_path FROM media WHERE id = bp.featured_image_id) AS featured_image_path",
+		"bp.author_id", "bp.status",
+		"bp.published_at", "bp.created_at", "bp.updated_at",
+		"bp.metadata",
 	).
-		From("blog_posts").
-		Where(sq.Eq{"id": postID})
+		From("blog_posts bp").
+		Where(sq.Eq{"bp.id": postID})
 
 	sqlQuery, args, err := queryBuilder.ToSql()
 	if err != nil {
@@ -189,6 +200,7 @@ func (b *BlogRepo) GetBlogPostByID(ctx context.Context, postID uuid.UUID) (*mode
 		&post.Excerpt,
 		&post.Content,
 		&post.FeaturedImageID,
+		&post.FeaturedImagePath,
 		&post.AuthorID,
 		&post.Status,
 		&publishedAt,
