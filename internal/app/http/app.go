@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"path"
+	"strings"
 	"time"
 
 	"premium_caste/internal/metrics"
@@ -214,6 +217,28 @@ func (s *Server) BuildRouters() {
 	s.e.GET("/metrics", echo.WrapHandler(promhttp.HandlerFor(s.metricsReg, promhttp.HandlerOpts{})))
 	s.e.GET("/swagger/*", echoSwagger.WrapHandler)
 
+	s.e.GET("/uploads/*", func(c echo.Context) error {
+		filePath := path.Join("uploads", c.Param("*"))
+
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			return echo.NewHTTPError(http.StatusNotFound, "File not found")
+		}
+
+		if strings.Contains(filePath, "../") {
+			return echo.NewHTTPError(http.StatusForbidden, "Invalid path")
+		}
+
+		return c.File(filePath)
+	})
+
+	// s.e.Static("/uploads", "./uploads")
+	// s.e.GET("/uploads/*", func(c echo.Context) error {
+	// 	return s.adminOnlyMiddleware(func(c echo.Context) error {
+	// 		filepath := "uploads/" + c.Param("*")
+	// 		return c.File(filepath)
+	// 	})(c)
+	// }, s.jwtFromCookieMiddleware)
+
 	api := s.e.Group("/api/v1")
 	api.Use(prommiddleware.PrometheusMetrics)
 	{
@@ -223,9 +248,6 @@ func (s *Server) BuildRouters() {
 
 		userGroup := api.Group("/users")
 		userGroup.Use(s.jwtFromCookieMiddleware)
-		// userGroup.Use(echojwt.WithConfig(echojwt.Config{
-		// 	SigningKey: []byte(s.token),
-		// }))
 		{
 			userGroup.GET("/:user_id/is-admin", s.routers.IsAdminPermission)
 			userGroup.POST("/user_id", s.routers.GetUserById)
@@ -233,9 +255,6 @@ func (s *Server) BuildRouters() {
 
 		mediaGroup := api.Group("/media", s.adminOnlyMiddleware)
 		mediaGroup.Use(s.jwtFromCookieMiddleware)
-		// mediaGroup.Use(echojwt.WithConfig(echojwt.Config{
-		// 	SigningKey: []byte(s.token),
-		// }))
 		{
 			mediaGroup.POST("/upload", s.routers.UploadMedia)
 			mediaGroup.POST("/groups/attach", s.routers.AttachMediaToGroup)
@@ -248,9 +267,6 @@ func (s *Server) BuildRouters() {
 		blogGroup.GET("", s.routers.ListPosts)
 		blogGroup.GET("/:id", s.routers.GetPost)
 		blogGroup.Use(s.jwtFromCookieMiddleware)
-		// blogGroup.Use(echojwt.WithConfig(echojwt.Config{
-		// 	SigningKey: []byte(s.token),
-		// }))
 		{
 			blogGroup.POST("", s.routers.CreatePost, s.adminOnlyMiddleware)
 			blogGroup.PUT("/:id", s.routers.UpdatePost, s.adminOnlyMiddleware)

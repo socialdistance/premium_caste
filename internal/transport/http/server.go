@@ -578,7 +578,7 @@ func (r *Routers) ListGroupMedia(c echo.Context) error {
 //	}
 //
 // @Failure 500 {object} response.ErrorResponse "Внутренняя ошибка сервера"
-// @Router /api/images [get]
+// @Router /api/v1/media/images [get]
 func (r *Routers) GetAllImages(c echo.Context) error {
 	const op = "http.routers.GetAllImages"
 
