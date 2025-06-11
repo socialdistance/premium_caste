@@ -60,9 +60,18 @@ func New(log *slog.Logger, token string, host, port string, routers *httprouters
 		AllowCredentials: true,
 		MaxAge:           86400,
 	}))
-	e.Use(session.Middleware(sessions.NewCookieStore([]byte("test"))))
+	// e.Use(session.Middleware(sessions.NewCookieStore([]byte("test"))))
 
-	// e.Use(middleware.CORS())
+	store := sessions.NewCookieStore([]byte("test"))
+	store.Options = &sessions.Options{
+		MaxAge:   86400 * 7,
+		HttpOnly: true,
+		Path:     "/",
+		Secure:   true,
+	}
+
+	e.Use(session.Middleware(store))
+
 	e.Use(middleware.Recover())
 
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
@@ -169,6 +178,9 @@ func (s *Server) adminOnlyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			return c.JSON(http.StatusForbidden, response.ErrorResponse{Error: "admin access required"})
 		}
 
+		sess.Options.MaxAge = 86400 * 7 // Обновляем срок
+		sess.Save(c.Request(), c.Response())
+
 		return next(c)
 	}
 }
@@ -206,6 +218,10 @@ func (s *Server) jwtFromCookieMiddleware(next echo.HandlerFunc) echo.HandlerFunc
 				SameSite: http.SameSiteLaxMode,
 			})
 		}
+
+		sess, _ := session.Get("session", c)
+		sess.Options.MaxAge = 86400 * 7 // Обновляем срок
+		sess.Save(c.Request(), c.Response())
 
 		c.Set("user", token.Claims)
 

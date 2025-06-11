@@ -114,9 +114,21 @@ func (r *Routers) Login(c echo.Context) error {
 		return c.JSON(http.StatusUnauthorized, response.ErrAuthenticationFailed)
 	}
 
+	sess, _ := session.Get("session", c)
+	sess.Values["user_id"] = token.UserID
+	sess.Save(c.Request(), c.Response())
+
 	return c.JSON(http.StatusOK, response.Response{
 		Status: "success",
-		Data:   map[string]string{"user_id": token.UserID.String(), "access_token": token.AccessToken, "refresh_token": token.RefreshToken},
+		Data: map[string]interface{}{
+			"user_id":       token.UserID.String(),
+			"access_token":  token.AccessToken,
+			"refresh_token": token.RefreshToken,
+			"session": map[string]interface{}{
+				"expires_in": 86400 * 7,
+				"expires_at": time.Now().Add(86400 * 7 * time.Second).Format(time.RFC3339),
+			},
+		},
 	})
 }
 
