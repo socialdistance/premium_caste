@@ -164,7 +164,64 @@ func (r *MediaRepo) FindByID(ctx context.Context, id uuid.UUID) (*models.Media, 
 	return &media, nil
 }
 
-func (r *MediaRepo) AddMediaGroupItems(ctx context.Context, groupID, mediaID uuid.UUID) error {
+// func (r *MediaRepo) AddMediaGroupItems(ctx context.Context, groupID, mediaID uuid.UUID) error {
+// 	const op = "repository.media_repository.AddMediaGroupItems"
+
+// 	tx, err := r.db.Begin(ctx)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to begin transaction: %s %w", op, err)
+// 	}
+// 	defer tx.Rollback(ctx)
+
+// 	var groupExists bool
+// 	err = tx.QueryRow(ctx,
+// 		`SELECT EXISTS(SELECT 1 FROM media_groups WHERE id = $1)`,
+// 		groupID).Scan(&groupExists)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to check group existence: %s %w", op, err)
+// 	}
+// 	if !groupExists {
+// 		return fmt.Errorf("%s media group %s does not exist", op, groupID)
+// 	}
+
+// 	var mediaExists bool
+// 	err = tx.QueryRow(ctx,
+// 		`SELECT EXISTS(SELECT 1 FROM media WHERE id = $1)`,
+// 		mediaID).Scan(&mediaExists)
+// 	if err != nil {
+// 		return fmt.Errorf("%s failed to check media existence: %w", op, err)
+// 	}
+// 	if !mediaExists {
+// 		return fmt.Errorf("%s media file %s does not exist", op, mediaID)
+// 	}
+
+// 	query, args, err := r.sb.Insert("media_group_items").
+// 		Columns("group_id", "media_id", "position", "created_at").
+// 		Values(
+// 			groupID,
+// 			mediaID,
+// 			sq.Expr("(SELECT COALESCE(MAX(position), 0) + 1 FROM media_group_items WHERE group_id = ?)", groupID),
+// 			time.Now().UTC(),
+// 		).
+// 		Suffix("ON CONFLICT (group_id, media_id) DO NOTHING").
+// 		ToSql()
+// 	if err != nil {
+// 		return fmt.Errorf("%s failed to build query: %w", op, err)
+// 	}
+
+// 	_, err = tx.Exec(ctx, query, args...)
+// 	if err != nil {
+// 		return fmt.Errorf("%s failed to add media to group: %w", op, err)
+// 	}
+
+// 	if err := tx.Commit(ctx); err != nil {
+// 		return fmt.Errorf("%s failed to commit transaction: %w", op, err)
+// 	}
+
+// 	return nil
+// }
+
+func (r *MediaRepo) AddMediaGroupItems(ctx context.Context, groupID uuid.UUID, mediaIDs []uuid.UUID) error {
 	const op = "repository.media_repository.AddMediaGroupItems"
 
 	tx, err := r.db.Begin(ctx)
@@ -173,6 +230,7 @@ func (r *MediaRepo) AddMediaGroupItems(ctx context.Context, groupID, mediaID uui
 	}
 	defer tx.Rollback(ctx)
 
+	// Проверка существования группы
 	var groupExists bool
 	err = tx.QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM media_groups WHERE id = $1)`,
@@ -184,25 +242,44 @@ func (r *MediaRepo) AddMediaGroupItems(ctx context.Context, groupID, mediaID uui
 		return fmt.Errorf("%s media group %s does not exist", op, groupID)
 	}
 
-	var mediaExists bool
-	err = tx.QueryRow(ctx,
-		`SELECT EXISTS(SELECT 1 FROM media WHERE id = $1)`,
-		mediaID).Scan(&mediaExists)
-	if err != nil {
-		return fmt.Errorf("%s failed to check media existence: %w", op, err)
-	}
-	if !mediaExists {
-		return fmt.Errorf("%s media file %s does not exist", op, mediaID)
+	// Проверка существования всех mediaID
+	for _, mediaID := range mediaIDs {
+		var mediaExists bool
+		err = tx.QueryRow(ctx,
+			`SELECT EXISTS(SELECT 1 FROM media WHERE id = $1)`,
+			mediaID).Scan(&mediaExists)
+		if err != nil {
+			return fmt.Errorf("%s failed to check media existence: %w", op, err)
+		}
+		if !mediaExists {
+			return fmt.Errorf("%s media file %s does not exist", op, mediaID)
+		}
 	}
 
-	query, args, err := r.sb.Insert("media_group_items").
-		Columns("group_id", "media_id", "position", "created_at").
-		Values(
+	// Получаем текущую максимальную позицию для группы
+	var maxPosition int
+	err = tx.QueryRow(ctx,
+		`SELECT COALESCE(MAX(position), 0) FROM media_group_items WHERE group_id = $1`,
+		groupID).Scan(&maxPosition)
+	if err != nil {
+		return fmt.Errorf("%s failed to get max position: %w", op, err)
+	}
+
+	// Подготавливаем пакетную вставку
+	builder := r.sb.Insert("media_group_items").
+		Columns("group_id", "media_id", "position", "created_at")
+
+	maxPosition = 0
+	for i, mediaID := range mediaIDs {
+		builder = builder.Values(
 			groupID,
 			mediaID,
-			sq.Expr("(SELECT COALESCE(MAX(position), 0) + 1 FROM media_group_items WHERE group_id = ?)", groupID),
+			maxPosition+i+1,
 			time.Now().UTC(),
-		).
+		)
+	}
+
+	query, args, err := builder.
 		Suffix("ON CONFLICT (group_id, media_id) DO NOTHING").
 		ToSql()
 	if err != nil {
@@ -211,7 +288,7 @@ func (r *MediaRepo) AddMediaGroupItems(ctx context.Context, groupID, mediaID uui
 
 	_, err = tx.Exec(ctx, query, args...)
 	if err != nil {
-		return fmt.Errorf("%s failed to add media to group: %w", op, err)
+		return fmt.Errorf("%s failed to exec transaction: %w", op, err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {

@@ -36,7 +36,7 @@ func (m *MockMediaRepository) AddMediaGroup(ctx context.Context, ownerID uuid.UU
 	return args.Get(0).(uuid.UUID), args.Error(1)
 }
 
-func (m *MockMediaRepository) AddMediaGroupItems(ctx context.Context, groupID, mediaID uuid.UUID) error {
+func (m *MockMediaRepository) AddMediaGroupItems(ctx context.Context, groupID uuid.UUID, mediaID []uuid.UUID) error {
 	args := m.Called(ctx, groupID, mediaID)
 	return args.Error(0)
 }
@@ -185,7 +185,7 @@ func TestMediaRepositoryMethods(t *testing.T) {
 	repoMock.On("FindByID", mock.Anything, testMedia.ID).Return(testMedia, nil)
 	repoMock.On("UpdateMedia", mock.Anything, testMedia).Return(nil)
 
-	assert.NoError(t, repoMock.AddMediaGroupItems(context.Background(), groupID, mediaID))
+	assert.NoError(t, repoMock.AddMediaGroupItems(context.Background(), groupID, []uuid.UUID{mediaID}))
 
 	found, err := repoMock.FindByID(context.Background(), testMedia.ID)
 	assert.NoError(t, err)
@@ -211,21 +211,21 @@ func TestAttachMediaToGroup(t *testing.T) {
 		mockRepo.On("AddMediaGroupItems", mock.Anything, validGroupID, validMediaID).
 			Return(nil)
 
-		err := service.AttachMediaToGroup(context.Background(), validGroupID, validMediaID)
+		err := service.AttachMediaToGroup(context.Background(), validGroupID, []uuid.UUID{validMediaID})
 
 		assert.NoError(t, err)
 		mockRepo.AssertExpectations(t)
 	})
 
 	t.Run("Validation error, empty groupID", func(t *testing.T) {
-		err := service.AttachMediaToGroup(context.Background(), uuid.Nil, validMediaID)
+		err := service.AttachMediaToGroup(context.Background(), uuid.Nil, []uuid.UUID{validMediaID})
 
 		assert.ErrorContains(t, err, "groupID is required")
 		mockRepo.AssertNotCalled(t, "AddMediaToGroup")
 	})
 
 	t.Run("Validation error, empty mediaID", func(t *testing.T) {
-		err := service.AttachMediaToGroup(context.Background(), validGroupID, uuid.Nil)
+		err := service.AttachMediaToGroup(context.Background(), validGroupID, []uuid.UUID{uuid.Nil})
 
 		assert.ErrorContains(t, err, "mediaID is required")
 		mockRepo.AssertNotCalled(t, "AddMediaToGroup")

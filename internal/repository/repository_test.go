@@ -241,7 +241,7 @@ func TestMediaRepo_GroupOperations(t *testing.T) {
 		groupID := mustCreateGroup(t, db, ownerID)
 
 		// Добавляем медиа в группу
-		err := repo.AddMediaGroupItems(testCtx, groupID, media1.ID)
+		err := repo.AddMediaGroupItems(testCtx, groupID, []uuid.UUID{media1.ID, media2.ID})
 		require.NoError(t, err)
 
 		// Проверяем связь в БД
@@ -254,7 +254,7 @@ func TestMediaRepo_GroupOperations(t *testing.T) {
 		require.Equal(t, 1, position)
 
 		// Добавляем второе медиа и проверяем позицию
-		err = repo.AddMediaGroupItems(testCtx, groupID, media2.ID)
+		err = repo.AddMediaGroupItems(testCtx, groupID, []uuid.UUID{media2.ID})
 		require.NoError(t, err)
 
 		err = db.QueryRow(testCtx, `
@@ -306,7 +306,7 @@ func mustCreateGroup(t *testing.T, db *pgxpool.Pool, ownerID uuid.UUID) uuid.UUI
 }
 
 func mustAddToGroup(t *testing.T, repo *repository.MediaRepo, groupID, mediaID uuid.UUID) {
-	err := repo.AddMediaGroupItems(testCtx, groupID, mediaID)
+	err := repo.AddMediaGroupItems(testCtx, groupID, []uuid.UUID{mediaID})
 	require.NoError(t, err)
 }
 
@@ -369,7 +369,7 @@ func TestMediaRepo_TransactionHandling(t *testing.T) {
 	mediaID := uuid.New() // Несуществующий медиа-файл
 
 	t.Run("transaction rollback on error", func(t *testing.T) {
-		err := repo.AddMediaGroupItems(testCtx, groupID, mediaID)
+		err := repo.AddMediaGroupItems(testCtx, groupID, []uuid.UUID{mediaID})
 		require.Error(t, err)
 
 		// Проверяем, что в группе нет элементов

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"premium_caste/internal/domain/models"
@@ -30,7 +31,7 @@ type UserService interface {
 
 type MediaService interface {
 	UploadMedia(ctx context.Context, input dto.MediaUploadInput) (*models.Media, error)
-	AttachMediaToGroup(ctx context.Context, groupID uuid.UUID, mediaID uuid.UUID) error
+	AttachMediaToGroup(ctx context.Context, groupID uuid.UUID, mediaIDs []uuid.UUID) error
 	AttachMedia(ctx context.Context, ownerID uuid.UUID, description string) (uuid.UUID, error)
 	ListGroupMedia(ctx context.Context, groupID uuid.UUID) ([]models.Media, error)
 	GetAllImages(ctx context.Context) ([]models.Media, error)
@@ -392,14 +393,25 @@ func (r *Routers) UploadMedia(c echo.Context) error {
 
 // AttachMediaToGroup godoc
 // @Summary Прикрепить медиа к группе
-// @Description Связывает медиафайл с существующей медиагруппой
+// @Description Связывает один или несколько медиафайлов с существующей медиагруппой
 // @Tags Медиа-группы
-// @Accept multipart/form-data
+// @Accept json
 // @Produce json
 // @Param group_id path string true "UUID группы" format(uuid)
-// @Param media_id formData string true "UUID медиафайла" format(uuid)
+// @Param request body dto.AttachMediaRequest true "Данные для прикрепления"
+//
+//	{
+//	  "mediaIDs": [
+//	    "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+//	    "4fb85f64-5717-4562-b3fc-2c963f66afa7"
+//	  ]
+//	}
+//
 // @Success 200 "Успешное прикрепление (no content)"
-// @Failure 400 {object} response.ErrorResponse "Невалидные UUID группы или медиа"
+// @Success 200 {object} response.SuccessResponse "Успешное прикрепление (с расширенным ответом)"
+// @Failure 400 {object} response.ErrorResponse "Невалидные данные: пустой массив, неверный формат UUID"
+// @Failure 404 {object} response.ErrorResponse "Группа не найдена"
+// @Failure 413 {object} response.ErrorResponse "Превышен лимит количества медиафайлов"
 // @Failure 500 {object} response.ErrorResponse "Ошибка привязки медиа"
 // @Security ApiKeyAuth
 // @Router /api/v1/media/groups/{group_id}/attach [post]
@@ -412,33 +424,61 @@ func (r *Routers) AttachMediaToGroup(c echo.Context) error {
 
 	req := new(dto.AttachMediaRequest)
 	if err := c.Bind(req); err != nil {
-		log.Error("error invalid request data format", sl.Err(err))
+		log.Error("invalid request data format", sl.Err(err))
 		return c.JSON(http.StatusBadRequest, response.ErrorResponse{
 			Error: "Invalid request data format",
 		})
 	}
 
+	// 2. Валидация запроса
 	if err := c.Validate(req); err != nil {
-		log.Error("error validate", sl.Err(err))
+		log.Error("validation failed", sl.Err(err))
 		return c.JSON(http.StatusBadRequest, response.ErrorResponse{
 			Error: err.Error(),
 		})
 	}
 
-	groupID, _ := uuid.Parse(req.GroupID)
-	mediaID, _ := uuid.Parse(req.MediaID)
+	// 3. Парсинг groupID
+	groupID, err := uuid.Parse(req.GroupID)
+	if err != nil {
+		log.Error("invalid groupID format", sl.Err(err))
+		return c.JSON(http.StatusBadRequest, response.ErrorResponse{
+			Error: "Invalid groupID format",
+		})
+	}
 
+	// 4. Парсинг массива mediaIDs
+	mediaIDs := make([]uuid.UUID, 0, len(req.MediaIDs))
+	for _, idStr := range req.MediaIDs {
+		mediaID, err := uuid.Parse(idStr)
+		if err != nil {
+			log.Error("invalid mediaID format", slog.String("mediaID", idStr), sl.Err(err))
+			return c.JSON(http.StatusBadRequest, response.ErrorResponse{
+				Error: fmt.Sprintf("Invalid mediaID format: %s", idStr),
+			})
+		}
+		mediaIDs = append(mediaIDs, mediaID)
+	}
+
+	// 5. Вызов сервиса с массивом mediaIDs
 	if err := r.MediaService.AttachMediaToGroup(
 		c.Request().Context(),
 		groupID,
-		mediaID,
+		mediaIDs,
 	); err != nil {
+		log.Error("failed to attach media", sl.Err(err))
 		return c.JSON(http.StatusInternalServerError, response.ErrorResponse{
 			Error: err.Error(),
 		})
 	}
 
-	return c.NoContent(http.StatusOK)
+	return c.JSON(http.StatusOK, response.Response{
+		Status: "success",
+		Data: map[string]interface{}{
+			"attachedCount": len(mediaIDs),
+			"groupID":       groupID.String(),
+		},
+	})
 }
 
 // CreateMediaGroup godoc

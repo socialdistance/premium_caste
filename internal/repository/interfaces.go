@@ -27,7 +27,7 @@ type TokenRepository interface {
 type MediaRepository interface {
 	CreateMedia(ctx context.Context, media *models.Media) (*models.Media, error)
 	AddMediaGroup(ctx context.Context, ownerID uuid.UUID, description string) (uuid.UUID, error)
-	AddMediaGroupItems(ctx context.Context, groupID, mediaID uuid.UUID) error
+	AddMediaGroupItems(ctx context.Context, groupID uuid.UUID, mediaIDs []uuid.UUID) error
 	UpdateMedia(ctx context.Context, media *models.Media) error
 	FindByID(ctx context.Context, id uuid.UUID) (*models.Media, error)
 	GetMediaByGroupID(ctx context.Context, groupID uuid.UUID) ([]models.Media, error)

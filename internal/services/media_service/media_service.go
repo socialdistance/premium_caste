@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"slices"
 )
 
 type MediaService struct {
@@ -83,33 +84,41 @@ func (s *MediaService) UploadMedia(ctx context.Context, input dto.MediaUploadInp
 	return createdMedia, nil
 }
 
-func (s *MediaService) AttachMediaToGroup(ctx context.Context, groupID uuid.UUID, mediaID uuid.UUID) error {
+func (s *MediaService) AttachMediaToGroup(ctx context.Context, groupID uuid.UUID, mediaIDs []uuid.UUID) error {
 	const op = "media_service.AttachMediaToGroupItems"
 
 	log := s.log.With(
 		"op", op,
 		"groupID", groupID,
-		"mediaID", mediaID,
+		"mediaIDs", mediaIDs, // Логируем весь массив
 	)
 
+	// Валидация параметров
 	if groupID == uuid.Nil {
 		log.Info("groupID is required", "op", op)
 		return fmt.Errorf("%s: groupID is required", op)
 	}
-	if mediaID == uuid.Nil {
-		log.Info("mediaID is required", "op", op)
-		return fmt.Errorf("%s: mediaID is required", op)
+	if len(mediaIDs) == 0 {
+		log.Info("at least one mediaID is required", "op", op)
+		return fmt.Errorf("%s: at least one mediaID is required", op)
 	}
 
-	if err := s.repo.AddMediaGroupItems(ctx, groupID, mediaID); err != nil {
+	// Проверка на нулевые UUID в массиве
+	if slices.Contains(mediaIDs, uuid.Nil) {
+			log.Info("mediaID cannot be nil", "op", op)
+			return fmt.Errorf("%s: mediaID cannot be nil", op)
+		}
+
+	// Вызов репозитория с массивом mediaIDs
+	if err := s.repo.AddMediaGroupItems(ctx, groupID, mediaIDs); err != nil {
 		log.Error("%s: failed to attach media: %s", op, sl.Err(err))
 		return fmt.Errorf("%s: failed to attach media: %w", op, err)
 	}
 
-	log.Debug("media attached to group",
+	log.Debug("media files attached to group",
 		"op", op,
 		"groupID", groupID,
-		"mediaID", mediaID,
+		"mediaCount", len(mediaIDs), // Логируем количество прикрепленных файлов
 	)
 
 	return nil
