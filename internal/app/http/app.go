@@ -282,6 +282,7 @@ func (s *Server) BuildRouters() {
 		blogGroup := api.Group("/posts")
 		blogGroup.GET("", s.routers.ListPosts)
 		blogGroup.GET("/:id", s.routers.GetPost)
+		blogGroup.GET("/:id/media-groups", s.routers.GetPostMediaGroups)
 		blogGroup.Use(s.jwtFromCookieMiddleware)
 		{
 			blogGroup.POST("", s.routers.CreatePost, s.adminOnlyMiddleware)
@@ -290,7 +291,6 @@ func (s *Server) BuildRouters() {
 			blogGroup.PATCH("/:id/publish", s.routers.PublishPost, s.adminOnlyMiddleware)
 			blogGroup.PATCH("/:id/archive", s.routers.ArchivePost, s.adminOnlyMiddleware)
 			blogGroup.POST("/:id/media-groups", s.routers.AddMediaGroup, s.adminOnlyMiddleware)
-			blogGroup.GET("/:id/media-groups", s.routers.GetPostMediaGroups, s.adminOnlyMiddleware)
 		}
 	}
 }

@@ -333,6 +333,7 @@ func (s *BlogService) AddMediaGroup(ctx context.Context, postID uuid.UUID, req d
 }
 
 // GetPostMediaGroups возвращает медиа-группы поста
+// не работает. Удалить
 func (s *BlogService) GetPostMediaGroups(ctx context.Context, postID uuid.UUID, relationType string) (*dto.PostMediaGroupsResponse, error) {
 	const op = "blog_service.GetPostMediaGroups"
 	log := s.log.With(
@@ -388,7 +389,11 @@ func (s *BlogService) toPostResponse(ctx context.Context, postID uuid.UUID) (*dt
 }
 
 func (s *BlogService) mapToPostResponse(post *models.BlogPost) *dto.BlogPostResponse {
-	return &dto.BlogPostResponse{
+	if post == nil {
+		return nil
+	}
+
+	response := &dto.BlogPostResponse{
 		ID:                post.ID,
 		Title:             post.Title,
 		Slug:              post.Slug,
@@ -403,4 +408,23 @@ func (s *BlogService) mapToPostResponse(post *models.BlogPost) *dto.BlogPostResp
 		UpdatedAt:         post.UpdatedAt,
 		Metadata:          post.Metadata,
 	}
+
+	if post.MediaGroups != nil {
+		response.MediaGroups = make(map[string][]dto.MediaItemResponse)
+
+		for relationType, items := range post.MediaGroups {
+			var mediaItems []dto.MediaItemResponse
+			for _, item := range items {
+				mediaItems = append(mediaItems, dto.MediaItemResponse{
+					ID:          item.ID,
+					StoragePath: item.StoragePath,
+					Position:    item.Position,
+					GroupID:     item.GroupID,
+				})
+			}
+			response.MediaGroups[relationType] = mediaItems
+		}
+	}
+
+	return response
 }

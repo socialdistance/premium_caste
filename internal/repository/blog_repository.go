@@ -161,19 +161,73 @@ func (b *BlogRepo) SoftDeleteBlogPost(ctx context.Context, postID uuid.UUID) err
 	return err
 }
 
+// func (b *BlogRepo) GetBlogPostByID(ctx context.Context, postID uuid.UUID) (*models.BlogPost, error) {
+// 	const op = "repository.blog_repository.GetBlogPostByID"
+
+// 	// queryBuilder := b.sb.Select(
+// 	// 	"id", "title", "slug", "excerpt", "content",
+// 	// 	"featured_image_id", "author_id", "status",
+// 	// 	"published_at", "created_at", "updated_at",
+// 	// 	"metadata",
+// 	// ).
+// 	// 	From("blog_posts").
+// 	// 	Where(sq.Eq{"id": postID})
+
+// 	queryBuilder := b.sb.Select(
+// 		"bp.id", "bp.title", "bp.slug", "bp.excerpt", "bp.content",
+// 		"bp.featured_image_id",
+// 		"(SELECT storage_path FROM media WHERE id = bp.featured_image_id) AS featured_image_path",
+// 		"bp.author_id", "bp.status",
+// 		"bp.published_at", "bp.created_at", "bp.updated_at",
+// 		"bp.metadata",
+// 	).
+// 		From("blog_posts bp").
+// 		Where(sq.Eq{"bp.id": postID})
+
+// 	sqlQuery, args, err := queryBuilder.ToSql()
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to build SQL query: %w", err)
+// 	}
+
+// 	var post models.BlogPost
+// 	var publishedAt sql.NullTime
+
+// 	// Выполнение запроса
+// 	err = b.db.QueryRow(ctx, sqlQuery, args...).Scan(
+// 		&post.ID,
+// 		&post.Title,
+// 		&post.Slug,
+// 		&post.Excerpt,
+// 		&post.Content,
+// 		&post.FeaturedImageID,
+// 		&post.FeaturedImagePath,
+// 		&post.AuthorID,
+// 		&post.Status,
+// 		&publishedAt,
+// 		&post.CreatedAt,
+// 		&post.UpdatedAt,
+// 		&post.Metadata,
+// 	)
+
+// 	if err != nil {
+// 		if errors.Is(err, sql.ErrNoRows) {
+// 			return nil, fmt.Errorf("%s post not found: %w", op, err)
+// 		}
+// 		return nil, fmt.Errorf("%s failed to get post: %w", op, err)
+// 	}
+
+// 	if publishedAt.Valid {
+// 		post.PublishedAt = &publishedAt.Time
+// 	}
+
+// 	return &post, nil
+// }
+
 func (b *BlogRepo) GetBlogPostByID(ctx context.Context, postID uuid.UUID) (*models.BlogPost, error) {
 	const op = "repository.blog_repository.GetBlogPostByID"
 
-	// queryBuilder := b.sb.Select(
-	// 	"id", "title", "slug", "excerpt", "content",
-	// 	"featured_image_id", "author_id", "status",
-	// 	"published_at", "created_at", "updated_at",
-	// 	"metadata",
-	// ).
-	// 	From("blog_posts").
-	// 	Where(sq.Eq{"id": postID})
-
-	queryBuilder := b.sb.Select(
+	// Основной запрос для получения информации о посте
+	postQuery := b.sb.Select(
 		"bp.id", "bp.title", "bp.slug", "bp.excerpt", "bp.content",
 		"bp.featured_image_id",
 		"(SELECT storage_path FROM media WHERE id = bp.featured_image_id) AS featured_image_path",
@@ -184,16 +238,37 @@ func (b *BlogRepo) GetBlogPostByID(ctx context.Context, postID uuid.UUID) (*mode
 		From("blog_posts bp").
 		Where(sq.Eq{"bp.id": postID})
 
-	sqlQuery, args, err := queryBuilder.ToSql()
-	if err != nil {
-		return nil, fmt.Errorf("failed to build SQL query: %w", err)
-	}
+	// Запрос для получения медиа-групп поста
+	mediaGroupsQuery := b.sb.Select(
+		"pmg.group_id",
+		"pmg.relation_type",
+		"mgi.media_id",
+		"m.storage_path",
+		"mgi.position",
+	).
+		From("post_media_groups pmg").
+		Join("media_group_items mgi ON pmg.group_id = mgi.group_id").
+		Join("media m ON mgi.media_id = m.id").
+		Where(sq.Eq{"pmg.post_id": postID}).
+		OrderBy("pmg.relation_type", "mgi.position")
 
+	// Выполняем оба запроса в транзакции
+	tx, err := b.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%s failed to begin transaction: %w", op, err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Получаем основную информацию о посте
 	var post models.BlogPost
 	var publishedAt sql.NullTime
 
-	// Выполнение запроса
-	err = b.db.QueryRow(ctx, sqlQuery, args...).Scan(
+	postSQL, postArgs, err := postQuery.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("%s failed to build post SQL query: %w", op, err)
+	}
+
+	err = tx.QueryRow(ctx, postSQL, postArgs...).Scan(
 		&post.ID,
 		&post.Title,
 		&post.Slug,
@@ -208,7 +283,6 @@ func (b *BlogRepo) GetBlogPostByID(ctx context.Context, postID uuid.UUID) (*mode
 		&post.UpdatedAt,
 		&post.Metadata,
 	)
-
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("%s post not found: %w", op, err)
@@ -218,6 +292,48 @@ func (b *BlogRepo) GetBlogPostByID(ctx context.Context, postID uuid.UUID) (*mode
 
 	if publishedAt.Valid {
 		post.PublishedAt = &publishedAt.Time
+	}
+
+	// Получаем медиа-группы
+	mediaGroupsSQL, mediaGroupsArgs, err := mediaGroupsQuery.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("%s failed to build media groups SQL query: %w", op, err)
+	}
+
+	rows, err := tx.Query(ctx, mediaGroupsSQL, mediaGroupsArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("%s failed to query media groups: %w", op, err)
+	}
+	defer rows.Close()
+
+	post.MediaGroups = make(map[string][]models.MediaItem)
+	for rows.Next() {
+		var (
+			groupID      uuid.UUID
+			relationType string
+			mediaID      uuid.UUID
+			storagePath  string
+			position     int
+		)
+
+		if err := rows.Scan(&groupID, &relationType, &mediaID, &storagePath, &position); err != nil {
+			return nil, fmt.Errorf("%s failed to scan media group row: %w", op, err)
+		}
+
+		post.MediaGroups[relationType] = append(post.MediaGroups[relationType], models.MediaItem{
+			ID:          mediaID,
+			StoragePath: storagePath,
+			Position:    position,
+			GroupID:     groupID,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s error iterating media groups: %w", op, err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("%s failed to commit transaction: %w", op, err)
 	}
 
 	return &post, nil

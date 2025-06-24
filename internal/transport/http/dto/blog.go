@@ -48,19 +48,27 @@ type UpdateBlogPostResponse struct {
 }
 
 type BlogPostResponse struct {
-	ID                uuid.UUID      `json:"id" swaggertype:"string" format:"uuid"`
-	Title             string         `json:"title"`
-	Slug              string         `json:"slug"`
-	Excerpt           string         `json:"excerpt,omitempty"`
-	Content           string         `json:"content"`
-	FeaturedImageID   uuid.UUID      `json:"featured_image_id,omitempty" swaggertype:"string" format:"uuid"`
-	FeaturedImagePath *string        `json:"featured_image_path"`
-	AuthorID          uuid.UUID      `json:"author_id" swaggertype:"string" format:"uuid"`
-	Status            string         `json:"status"`
-	PublishedAt       *time.Time     `json:"published_at,omitempty"`
-	CreatedAt         time.Time      `json:"created_at"`
-	UpdatedAt         time.Time      `json:"updated_at"`
-	Metadata          map[string]any `json:"metadata,omitempty"`
+	ID                uuid.UUID                      `json:"id" swaggertype:"string" format:"uuid"`
+	Title             string                         `json:"title"`
+	Slug              string                         `json:"slug"`
+	Excerpt           string                         `json:"excerpt,omitempty"`
+	Content           string                         `json:"content"`
+	FeaturedImageID   uuid.UUID                      `json:"featured_image_id,omitempty" swaggertype:"string" format:"uuid"`
+	FeaturedImagePath *string                        `json:"featured_image_path"`
+	AuthorID          uuid.UUID                      `json:"author_id" swaggertype:"string" format:"uuid"`
+	Status            string                         `json:"status"`
+	PublishedAt       *time.Time                     `json:"published_at,omitempty"`
+	CreatedAt         time.Time                      `json:"created_at"`
+	UpdatedAt         time.Time                      `json:"updated_at"`
+	Metadata          map[string]any                 `json:"metadata,omitempty"`
+	MediaGroups       map[string][]MediaItemResponse `json:"media_groups"`
+}
+
+type MediaItemResponse struct {
+	ID          uuid.UUID `json:"id"`
+	StoragePath string    `json:"storage_path"`
+	Position    int       `json:"position"`
+	GroupID     uuid.UUID `json:"group_id"`
 }
 
 type BlogPostListResponse struct {
