@@ -6,6 +6,9 @@ generate:
 run:
 	go run cmd/premium_caste/main.go --config=./config/config.yaml
 
+run-dev:
+	docker-compose -f docker-compose.dev.yaml up --build
+
 run-race:
 	go run ./file_service/cmd/file_service/main.go --config=./file_service/config/local.yaml
 
