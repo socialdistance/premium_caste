@@ -54,7 +54,7 @@ func New(log *slog.Logger, token string, host, port string, routers *httprouters
 	e.Validator = &CustomValidator{validator: validate}
 
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:4173"},
 		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch},
 		AllowHeaders:     []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept},
 		AllowCredentials: true,
@@ -179,7 +179,9 @@ func (s *Server) adminOnlyMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		sess.Options.MaxAge = 86400 * 7 // Обновляем срок
-		sess.Save(c.Request(), c.Response())
+		if err := sess.Save(c.Request(), c.Response()); err != nil {
+			return c.JSON(http.StatusInternalServerError, "failed to save session")
+		}
 
 		return next(c)
 	}
@@ -214,7 +216,7 @@ func (s *Server) jwtFromCookieMiddleware(next echo.HandlerFunc) echo.HandlerFunc
 				Expires:  time.Now().Add(1 * time.Hour),
 				Path:     "/",
 				HttpOnly: true,
-				Secure:   true,
+				Secure:   false,
 				SameSite: http.SameSiteLaxMode,
 			})
 		}

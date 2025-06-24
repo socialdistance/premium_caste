@@ -257,7 +257,9 @@ func (r *Routers) IsAdminPermission(c echo.Context) error {
 
 	sess, _ := session.Get("session", c)
 	sess.Values["user_id"] = userID.String()
-	sess.Save(c.Request(), c.Response())
+	if err := sess.Save(c.Request(), c.Response()); err != nil {
+		return c.JSON(http.StatusInternalServerError, "failed to save session")
+	}
 
 	return c.JSON(http.StatusOK, map[string]bool{
 		"is_admin": isAdmin,

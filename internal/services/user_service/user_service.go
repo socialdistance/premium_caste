@@ -86,7 +86,7 @@ func (u *UserService) Login(ctx context.Context, c echo.Context, identifier, pas
 		Value:    token.AccessToken,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   false,
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
@@ -96,7 +96,7 @@ func (u *UserService) Login(ctx context.Context, c echo.Context, identifier, pas
 		Value:    token.RefreshToken,
 		Path:     "/api/v1/refresh",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   false,
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Now().Add(7 * 24 * time.Hour),
 	})
