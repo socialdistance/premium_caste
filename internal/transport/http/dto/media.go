@@ -30,7 +30,7 @@ type CreateMediaGroupRequest struct {
 
 type AttachMediaRequest struct {
 	GroupID  string   `json:"group_id" validate:"required,uuid"`
-	MediaIDs []string `json:"media_id" validate:"required,min=1,dive,uuid4"`
+	MediaIDs []string `json:"media_id"`
 }
 
 type ListGroupMediaRequest struct {
