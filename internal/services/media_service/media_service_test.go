@@ -91,6 +91,11 @@ func (m *MockFileStorage) Save(ctx context.Context, file *multipart.FileHeader, 
 	return args.String(0), args.Get(1).(int64), args.Error(2)
 }
 
+func (m *MockFileStorage) SaveMultiple(ctx context.Context, files []*multipart.FileHeader, subPath string) ([]string, []int64, error) {
+	args := m.Called(ctx, files, subPath)
+	return args.Get(0).([]string), args.Get(1).([]int64), args.Error(2)
+}
+
 func (m *MockFileStorage) Delete(ctx context.Context, filePath string) error {
 	args := m.Called(ctx, filePath)
 

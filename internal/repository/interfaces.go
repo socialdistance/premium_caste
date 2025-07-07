@@ -44,3 +44,11 @@ type BlogRepository interface {
 	GetBlogPosts(ctx context.Context, statusFilter string, page int, perPage int) ([]models.BlogPost, int, error)
 	GetBlogPostByID(ctx context.Context, postID uuid.UUID) (*models.BlogPost, error)
 }
+
+type GalleryRepository interface {
+	CreateGallery(ctx context.Context, gallery models.Gallery) (uuid.UUID, error)
+	UpdateGallery(ctx context.Context, gallery models.Gallery) error
+	UpdateGalleryStatus(ctx context.Context, id uuid.UUID, status string) error
+	DeleteGallery(ctx context.Context, id uuid.UUID) error
+	GetGalleryByID(ctx context.Context, id uuid.UUID) (models.Gallery, error)
+}

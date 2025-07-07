@@ -134,7 +134,23 @@ func applyMigrations(pool *pgxpool.Pool) error {
 			group_id UUID NOT NULL,
 			relation_type VARCHAR(30) NOT NULL DEFAULT 'content', 
 			PRIMARY KEY (post_id, group_id)
-		);    
+		);
+		
+		CREATE TABLE galleries (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			title VARCHAR(255) NOT NULL,
+			slug VARCHAR(255) UNIQUE NOT NULL,
+			description TEXT,
+			images TEXT[] NOT NULL DEFAULT '{}',
+			cover_image_index INT DEFAULT 0,      
+			author_id UUID NOT NULL,
+			status VARCHAR(20) NOT NULL DEFAULT 'draft',
+			published_at TIMESTAMPTZ,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			metadata JSONB,
+			tags VARCHAR(255)[] DEFAULT '{}'      
+		);
 	`)
 
 	return err
@@ -898,4 +914,329 @@ func TestMediaGroupOperations(t *testing.T) {
 	// 	assert.Len(t, groups, 1)
 	// 	assert.Equal(t, groupID, groups[0])
 	// })
+}
+
+func TestGalleryRepo_CreateGallery(t *testing.T) {
+	db := setupTestDB(t)
+	repo := repository.NewGalleryRepo(db)
+
+	now := time.Now().UTC()
+	testCtx := context.Background()
+
+	tests := []struct {
+		name     string
+		gallery  models.Gallery
+		wantErr  bool
+		preSetup func() uuid.UUID // Функция для предварительной настройки теста
+	}{
+		{
+			name: "successful creation",
+			gallery: models.Gallery{
+				Title:           "Test Gallery",
+				Slug:            "test-gallery",
+				Description:     "Test description",
+				Images:          []string{"image1.jpg", "image2.jpg"},
+				CoverImageIndex: 0,
+				AuthorID:        uuid.New(),
+				Status:          "draft",
+				Metadata:        map[string]interface{}{"key": "value"},
+				Tags:            []string{"tag1", "tag2"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.preSetup != nil {
+				existingID := tt.preSetup()
+				if tt.gallery.Slug == "" {
+					// Получаем slug существующей галереи
+					var existingSlug string
+					err := db.QueryRow(testCtx,
+						"SELECT slug FROM galleries WHERE id = $1", existingID).Scan(&existingSlug)
+					require.NoError(t, err)
+					tt.gallery.Slug = existingSlug
+				}
+			}
+
+			id, err := repo.CreateGallery(testCtx, tt.gallery)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotEqual(t, uuid.Nil, id)
+
+			// Проверяем, что данные записались в БД
+			var dbGallery models.Gallery
+			err = db.QueryRow(testCtx,
+				`SELECT id, title, slug, description, images, cover_image_index, 
+				 author_id, status, metadata, tags, created_at, updated_at
+				 FROM galleries WHERE id = $1`, id).
+				Scan(
+					&dbGallery.ID,
+					&dbGallery.Title,
+					&dbGallery.Slug,
+					&dbGallery.Description,
+					&dbGallery.Images,
+					&dbGallery.CoverImageIndex,
+					&dbGallery.AuthorID,
+					&dbGallery.Status,
+					&dbGallery.Metadata,
+					&dbGallery.Tags,
+					&dbGallery.CreatedAt,
+					&dbGallery.UpdatedAt,
+				)
+			require.NoError(t, err)
+
+			require.Equal(t, tt.gallery.Title, dbGallery.Title)
+			require.Equal(t, tt.gallery.Slug, dbGallery.Slug)
+			require.Equal(t, tt.gallery.Description, dbGallery.Description)
+			require.Equal(t, tt.gallery.Images, dbGallery.Images)
+			require.Equal(t, tt.gallery.CoverImageIndex, dbGallery.CoverImageIndex)
+			require.Equal(t, tt.gallery.AuthorID, dbGallery.AuthorID)
+			require.Equal(t, tt.gallery.Status, dbGallery.Status)
+			require.Equal(t, tt.gallery.Metadata, dbGallery.Metadata)
+			require.Equal(t, tt.gallery.Tags, dbGallery.Tags)
+			require.WithinDuration(t, now, dbGallery.CreatedAt, time.Second)
+			require.WithinDuration(t, now, dbGallery.UpdatedAt, time.Second)
+		})
+	}
+}
+
+func TestGalleryRepo_UpdateGallery(t *testing.T) {
+	db := setupTestDB(t)
+	repo := repository.NewGalleryRepo(db)
+	testCtx := context.Background()
+
+	// Создаем тестовую галерею
+	gallery := models.Gallery{
+		Title:    "Original Title",
+		Slug:     "original-slug",
+		AuthorID: uuid.New(),
+		Images:   []string{"new1.jpg", "new2.jpg"},
+	}
+	id, err := repo.CreateGallery(testCtx, gallery)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		updates models.Gallery
+		wantErr bool
+	}{
+		{
+			name: "successful update",
+			updates: models.Gallery{
+				ID:              id,
+				Title:           "Updated Title",
+				Slug:            "updated-slug",
+				Description:     "Updated description",
+				Images:          []string{"new1.jpg", "new2.jpg"},
+				CoverImageIndex: 1,
+				Status:          "published",
+				Metadata:        map[string]interface{}{"new": "data"},
+				Tags:            []string{"new", "tags"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := repo.UpdateGallery(testCtx, tt.updates)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+
+			// Проверяем обновленные данные
+			var dbGallery models.Gallery
+			err = db.QueryRow(testCtx,
+				`SELECT title, slug, description, images, cover_image_index, 
+				 status, metadata, tags, updated_at
+				 FROM galleries WHERE id = $1`, id).
+				Scan(
+					&dbGallery.Title,
+					&dbGallery.Slug,
+					&dbGallery.Description,
+					&dbGallery.Images,
+					&dbGallery.CoverImageIndex,
+					&dbGallery.Status,
+					&dbGallery.Metadata,
+					&dbGallery.Tags,
+					&dbGallery.UpdatedAt,
+				)
+			require.NoError(t, err)
+
+			require.Equal(t, tt.updates.Title, dbGallery.Title)
+			require.Equal(t, tt.updates.Slug, dbGallery.Slug)
+			require.Equal(t, tt.updates.Description, dbGallery.Description)
+			require.Equal(t, tt.updates.Images, dbGallery.Images)
+			require.Equal(t, tt.updates.CoverImageIndex, dbGallery.CoverImageIndex)
+			require.Equal(t, tt.updates.Status, dbGallery.Status)
+			require.Equal(t, tt.updates.Metadata, dbGallery.Metadata)
+			require.Equal(t, tt.updates.Tags, dbGallery.Tags)
+			require.WithinDuration(t, time.Now().UTC(), dbGallery.UpdatedAt, time.Second)
+		})
+	}
+}
+
+func TestGalleryRepo_DeleteGallery(t *testing.T) {
+	db := setupTestDB(t)
+	repo := repository.NewGalleryRepo(db)
+	testCtx := context.Background()
+
+	// Создаем тестовую галерею
+	gallery := models.Gallery{
+		Title:    "To be deleted",
+		Slug:     "delete-me",
+		AuthorID: uuid.New(),
+		Images:   []string{"new1.jpg", "new2.jpg"},
+	}
+	id, err := repo.CreateGallery(testCtx, gallery)
+	require.NoError(t, err)
+
+	t.Run("successful deletion", func(t *testing.T) {
+		err := repo.DeleteGallery(testCtx, id)
+		require.NoError(t, err)
+
+		// Проверяем, что галерея удалена
+		var count int
+		err = db.QueryRow(testCtx,
+			"SELECT COUNT(*) FROM galleries WHERE id = $1", id).Scan(&count)
+		require.NoError(t, err)
+		require.Equal(t, 0, count)
+	})
+}
+
+func TestGalleryRepo_GetGalleryByID(t *testing.T) {
+	db := setupTestDB(t)
+	repo := repository.NewGalleryRepo(db)
+	testCtx := context.Background()
+
+	// Создаем тестовую галерею
+	expected := models.Gallery{
+		Title:           "Test Get Gallery",
+		Slug:            "test-get-gallery",
+		Description:     "Test description for get",
+		Images:          []string{"get1.jpg", "get2.jpg"},
+		CoverImageIndex: 1,
+		AuthorID:        uuid.New(),
+		Status:          "published",
+		Metadata:        map[string]interface{}{"get": "test"},
+		Tags:            []string{"get", "test"},
+	}
+	id, err := repo.CreateGallery(testCtx, expected)
+	require.NoError(t, err)
+	expected.ID = id
+
+	t.Run("successful get", func(t *testing.T) {
+		result, err := repo.GetGalleryByID(testCtx, id)
+		require.NoError(t, err)
+
+		require.Equal(t, expected.ID, result.ID)
+		require.Equal(t, expected.Title, result.Title)
+		require.Equal(t, expected.Slug, result.Slug)
+		require.Equal(t, expected.Description, result.Description)
+		require.Equal(t, expected.Images, result.Images)
+		require.Equal(t, expected.CoverImageIndex, result.CoverImageIndex)
+		require.Equal(t, expected.AuthorID, result.AuthorID)
+		require.Equal(t, expected.Status, result.Status)
+		require.Equal(t, expected.Metadata, result.Metadata)
+		require.Equal(t, expected.Tags, result.Tags)
+		require.False(t, result.CreatedAt.IsZero())
+		require.False(t, result.UpdatedAt.IsZero())
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		_, err := repo.GetGalleryByID(testCtx, uuid.New())
+		require.Error(t, err)
+		require.Equal(t, err, err)
+	})
+}
+
+func TestGalleryRepo_GetGalleries(t *testing.T) {
+	db := setupTestDB(t)
+	repo := repository.NewGalleryRepo(db)
+	testCtx := context.Background()
+
+	// Создаем тестовые галереи с разными статусами
+	gallery1 := models.Gallery{
+		Title:           "Published Gallery",
+		Slug:            "published-gallery",
+		Status:          "published",
+		AuthorID:        uuid.New(),
+		Images:          []string{"img1.jpg"},
+		CoverImageIndex: 0,
+	}
+
+	gallery2 := models.Gallery{
+		Title:           "Draft Gallery",
+		Slug:            "draft-gallery",
+		Status:          "draft",
+		AuthorID:        uuid.New(),
+		Images:          []string{"img2.jpg"},
+		CoverImageIndex: 0,
+	}
+
+	_, err := repo.CreateGallery(testCtx, gallery1)
+	require.NoError(t, err)
+	_, err = repo.CreateGallery(testCtx, gallery2)
+	require.NoError(t, err)
+
+	t.Run("get all galleries", func(t *testing.T) {
+		galleries, total, err := repo.GetGalleries(testCtx, "all", 1, 10)
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, total, 2)
+		require.GreaterOrEqual(t, len(galleries), 2)
+	})
+
+	t.Run("filter by published status", func(t *testing.T) {
+		galleries, total, err := repo.GetGalleries(testCtx, "published", 1, 10)
+		require.NoError(t, err)
+
+		require.GreaterOrEqual(t, total, 1)
+		require.GreaterOrEqual(t, len(galleries), 1)
+		require.Equal(t, "published", galleries[0].Status)
+	})
+
+	t.Run("filter by draft status", func(t *testing.T) {
+		galleries, total, err := repo.GetGalleries(testCtx, "draft", 1, 10)
+		require.NoError(t, err)
+
+		require.GreaterOrEqual(t, total, 1)
+		require.GreaterOrEqual(t, len(galleries), 1)
+		require.Equal(t, "draft", galleries[0].Status)
+	})
+
+	t.Run("pagination works", func(t *testing.T) {
+		// Первая страница - 1 запись
+		galleries, total, err := repo.GetGalleries(testCtx, "all", 1, 1)
+		require.NoError(t, err)
+
+		require.GreaterOrEqual(t, total, 2)
+		require.Equal(t, 1, len(galleries))
+
+		// Вторая страница - следующая запись
+		galleries, _, err = repo.GetGalleries(testCtx, "all", 2, 1)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(galleries))
+	})
+
+	t.Run("invalid status filter", func(t *testing.T) {
+		_, _, err := repo.GetGalleries(testCtx, "invalid_status", 1, 10)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid status filter")
+	})
+
+	t.Run("empty result", func(t *testing.T) {
+		galleries, total, err := repo.GetGalleries(testCtx, "archived", 1, 10)
+		require.NoError(t, err)
+		require.Equal(t, 2, total)
+		require.Empty(t, galleries)
+	})
 }

@@ -9,11 +9,12 @@ import (
 )
 
 type Repository struct {
-	db    *pgxpool.Pool
-	User  UserRepository
-	Media MediaRepository
-	Token TokenRepository
-	Blog  BlogRepository
+	db      *pgxpool.Pool
+	User    UserRepository
+	Media   MediaRepository
+	Token   TokenRepository
+	Blog    BlogRepository
+	Gallery GalleryRepository
 }
 
 func NewRepository(ctx context.Context, dsn string, redis *redisapp.Client) (*Repository, error) {
