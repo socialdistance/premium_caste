@@ -12,6 +12,7 @@ import (
 // FileStorage интерфейс для работы с файловым хранилищем
 type FileStorage interface {
 	Save(ctx context.Context, file *multipart.FileHeader, subPath string) (filePath string, fileSize int64, err error)
+	SaveMultiple(ctx context.Context, files []*multipart.FileHeader, subPath string) ([]string, []int64, error)
 	Delete(ctx context.Context, filePath string) error
 	GetFullPath(relativePath string) string
 	BaseURL() string
@@ -86,6 +87,30 @@ func (s *LocalFileStorage) Save(ctx context.Context, file *multipart.FileHeader,
 	}
 
 	return filepath.Join(subPath, file.Filename), size, nil
+}
+
+func (s *LocalFileStorage) SaveMultiple(ctx context.Context, files []*multipart.FileHeader, subPath string) ([]string, []int64, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	paths := make([]string, 0, len(files))
+	sizes := make([]int64, 0, len(files))
+
+	for _, file := range files {
+		path, size, err := s.Save(ctx, file, subPath)
+		if err != nil {
+			// Удаляем уже сохраненные файлы при ошибке
+			for _, p := range paths {
+				_ = os.Remove(filepath.Join(s.baseDir, p))
+			}
+			return nil, nil, fmt.Errorf("failed to save file %s: %w", file.Filename, err)
+		}
+		paths = append(paths, path)
+		sizes = append(sizes, size)
+	}
+
+	return paths, sizes, nil
 }
 
 // Delete удаляет файл из хранилища

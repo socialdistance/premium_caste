@@ -212,3 +212,87 @@ func TestConcurrentSaves(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestLocalFileStorage_SaveMultiple(t *testing.T) {
+	fs, tempDir := setupFileStorage(t)
+	defer cleanupFileStorage(t, tempDir)
+
+	ctx := context.Background()
+
+	// Создаем тестовые файлы
+	file1 := createTestFile(t, tempDir, "file1.txt", "content1")
+	file2 := createTestFile(t, tempDir, "file2.txt", "content2")
+	file3 := createTestFile(t, tempDir, "file3.txt", "content3")
+
+	t.Run("successful save multiple files", func(t *testing.T) {
+		paths, sizes, err := fs.SaveMultiple(ctx, []*multipart.FileHeader{file1, file2, file3}, "subdir")
+		require.NoError(t, err)
+
+		// Проверяем количество возвращенных путей и размеров
+		require.Equal(t, 3, len(paths))
+		require.Equal(t, 3, len(sizes))
+
+		// Проверяем корректность путей
+		assert.Equal(t, filepath.Join("subdir", "file1.txt"), paths[0])
+		assert.Equal(t, filepath.Join("subdir", "file2.txt"), paths[1])
+		assert.Equal(t, filepath.Join("subdir", "file3.txt"), paths[2])
+
+		// Проверяем корректность размеров
+		assert.Equal(t, int64(8), sizes[0]) // "content1" = 8 байт
+		assert.Equal(t, int64(8), sizes[1]) // "content2" = 8 байт
+		assert.Equal(t, int64(8), sizes[2]) // "content3" = 8 байт
+
+		// Проверяем что файлы созданы
+		for _, path := range paths {
+			fullPath := fs.GetFullPath(path)
+			_, err := os.Stat(fullPath)
+			assert.NoError(t, err)
+		}
+	})
+
+	t.Run("save multiple with empty subpath", func(t *testing.T) {
+		paths, _, err := fs.SaveMultiple(ctx, []*multipart.FileHeader{file1, file2}, "")
+		require.NoError(t, err)
+
+		assert.Equal(t, "file1.txt", paths[0])
+		assert.Equal(t, "file2.txt", paths[1])
+	})
+
+	t.Run("save multiple with context cancellation", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(ctx)
+		cancel() // Отменяем контекст сразу
+
+		_, _, err := fs.SaveMultiple(ctx, []*multipart.FileHeader{file1, file2}, "subdir")
+		assert.ErrorIs(t, err, context.Canceled)
+	})
+
+	t.Run("save multiple with error in one file", func(t *testing.T) {
+		// Создаем невалидный файл
+		invalidFile := &multipart.FileHeader{
+			Filename: "invalid.txt",
+		}
+
+		_, _, err := fs.SaveMultiple(ctx, []*multipart.FileHeader{file1, invalidFile, file2}, "subdir")
+		assert.Error(t, err)
+
+		// Проверяем что уже сохраненные файлы удалены
+		_, err = os.Stat(fs.GetFullPath(filepath.Join("subdir", "file1.txt")))
+		assert.True(t, os.IsNotExist(err))
+	})
+
+	t.Run("save multiple in read-only directory", func(t *testing.T) {
+		// Создаем read-only директорию
+		roDir := filepath.Join(tempDir, "readonly")
+		require.NoError(t, os.Mkdir(roDir, 0444))
+
+		_, _, err := fs.SaveMultiple(ctx, []*multipart.FileHeader{file1, file2}, "readonly/subdir")
+		assert.Error(t, err)
+	})
+
+	t.Run("save multiple with empty files list", func(t *testing.T) {
+		paths, sizes, err := fs.SaveMultiple(ctx, []*multipart.FileHeader{}, "subdir")
+		require.NoError(t, err)
+		assert.Empty(t, paths)
+		assert.Empty(t, sizes)
+	})
+}
