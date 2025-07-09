@@ -294,5 +294,16 @@ func (s *Server) BuildRouters() {
 			blogGroup.PATCH("/:id/archive", s.routers.ArchivePost, s.adminOnlyMiddleware)
 			blogGroup.POST("/:id/media-groups", s.routers.AddMediaGroup, s.adminOnlyMiddleware)
 		}
+
+		galleryGroup := api.Group("/gallery")
+		galleryGroup.GET("/galleries", s.routers.GetGalleriesHandler)
+		galleryGroup.GET("/galleries/:id", s.routers.GetGalleryByIDHandler)
+		galleryGroup.Use(s.jwtFromCookieMiddleware)
+		{
+			galleryGroup.POST("/galleries", s.routers.CreateGalleryHandler, s.adminOnlyMiddleware)
+			galleryGroup.PUT("/galleries/:id", s.routers.UpdateGalleryHandler, s.adminOnlyMiddleware)
+			galleryGroup.PATCH("/galleries/:id/status", s.routers.UpdateGalleryStatusHandler, s.adminOnlyMiddleware)
+			galleryGroup.DELETE("/galleries/:id", s.routers.DeleteGalleryHandler, s.adminOnlyMiddleware)
+		}
 	}
 }

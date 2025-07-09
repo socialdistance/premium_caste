@@ -14,6 +14,19 @@ definitions:
     - group_id
     - relation_type
     type: object
+  dto.AttachMediaRequest:
+    properties:
+      group_id:
+        type: string
+      media_id:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - group_id
+    - media_id
+    type: object
   dto.BlogPostListResponse:
     properties:
       page:
@@ -41,9 +54,17 @@ definitions:
       featured_image_id:
         format: uuid
         type: string
+      featured_image_path:
+        type: string
       id:
         format: uuid
         type: string
+      media_groups:
+        additionalProperties:
+          items:
+            $ref: '#/definitions/dto.MediaItemResponse'
+          type: array
+        type: object
       metadata:
         additionalProperties: {}
         type: object
@@ -93,6 +114,37 @@ definitions:
     - content
     - title
     type: object
+  dto.CreateGalleryRequest:
+    properties:
+      author_id:
+        type: string
+      cover_image_index:
+        description: Индекс изображения, используемого как обложка
+        type: integer
+      description:
+        type: string
+      images:
+        description: Список изображений в галерее
+        items:
+          type: string
+        type: array
+      metadata:
+        additionalProperties: true
+        type: object
+      slug:
+        type: string
+      status:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+    required:
+    - author_id
+    - title
+    type: object
   dto.MediaGroupResponse:
     properties:
       added_at:
@@ -101,6 +153,17 @@ definitions:
         format: uuid
         type: string
       relation_type:
+        type: string
+    type: object
+  dto.MediaItemResponse:
+    properties:
+      group_id:
+        type: string
+      id:
+        type: string
+      position:
+        type: integer
+      storage_path:
         type: string
     type: object
   dto.PostMediaGroupsResponse:
@@ -265,26 +328,6 @@ definitions:
 info:
   contact: {}
 paths:
-  /api/images:
-    get:
-      consumes:
-      - application/json
-      description: Возвращает список всех загруженных изображений с метаданными
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Успешный ответ
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Внутренняя ошибка сервера
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-      summary: Получить все изображения
-      tags:
-      - Медиа
   /api/v1/login:
     post:
       consumes:
@@ -391,8 +434,8 @@ paths:
   /api/v1/media/groups/{group_id}/attach:
     post:
       consumes:
-      - multipart/form-data
-      description: Связывает медиафайл с существующей медиагруппой
+      - application/json
+      description: Связывает один или несколько медиафайлов с существующей медиагруппой
       parameters:
       - description: UUID группы
         format: uuid
@@ -400,19 +443,27 @@ paths:
         name: group_id
         required: true
         type: string
-      - description: UUID медиафайла
-        format: uuid
-        in: formData
-        name: media_id
+      - description: Данные для прикрепления
+        in: body
+        name: request
         required: true
-        type: string
+        schema:
+          $ref: '#/definitions/dto.AttachMediaRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Успешное прикрепление (no content)
         "400":
-          description: Невалидные UUID группы или медиа
+          description: 'Невалидные данные: пустой массив, неверный формат UUID'
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Группа не найдена
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "413":
+          description: Превышен лимит количества медиафайлов
           schema:
             $ref: '#/definitions/response.ErrorResponse'
         "500":
@@ -424,6 +475,26 @@ paths:
       summary: Прикрепить медиа к группе
       tags:
       - Медиа-группы
+  /api/v1/media/images:
+    get:
+      consumes:
+      - application/json
+      description: Возвращает список всех загруженных изображений с метаданными
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешный ответ
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Получить все изображения
+      tags:
+      - Медиа
   /api/v1/media/upload:
     post:
       consumes:
@@ -931,4 +1002,40 @@ paths:
       summary: Получение информации о пользователе
       tags:
       - Пользователи
+  /galleries:
+    post:
+      consumes:
+      - application/json
+      description: Создает новую галерею на основе переданных данных.
+      parameters:
+      - description: Данные для создания галереи
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateGalleryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Галерея успешно создана, возвращает ID созданной галереи
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Некорректные данные запроса
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Ошибка при создании галереи
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Создание новой галереи
+      tags:
+      - Галереи
 swagger: "2.0"

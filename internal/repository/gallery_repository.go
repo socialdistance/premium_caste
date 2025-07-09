@@ -28,6 +28,7 @@ func NewGalleryRepo(db *pgxpool.Pool) *GalleryRepo {
 func (r *GalleryRepo) CreateGallery(ctx context.Context, gallery models.Gallery) (uuid.UUID, error) {
 	const op = "repository.GalleryRepo.CreateGallery"
 
+
 	query, args, err := r.sb.Insert("galleries").
 		Columns(
 			"title",

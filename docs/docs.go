@@ -15,36 +15,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/images": {
-            "get": {
-                "description": "Возвращает список всех загруженных изображений с метаданными",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Медиа"
-                ],
-                "summary": "Получить все изображения",
-                "responses": {
-                    "200": {
-                        "description": "Успешный ответ",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Внутренняя ошибка сервера",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/login": {
             "post": {
                 "description": "Вход в систему по email и паролю. Возвращает JWT-токен.",
@@ -216,9 +186,9 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Связывает медиафайл с существующей медиагруппой",
+                "description": "Связывает один или несколько медиафайлов с существующей медиагруппой",
                 "consumes": [
-                    "multipart/form-data"
+                    "application/json"
                 ],
                 "produces": [
                     "application/json"
@@ -237,12 +207,13 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "UUID медиафайла",
-                        "name": "media_id",
-                        "in": "formData",
-                        "required": true
+                        "description": "Данные для прикрепления",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.AttachMediaRequest"
+                        }
                     }
                 ],
                 "responses": {
@@ -250,13 +221,55 @@ const docTemplate = `{
                         "description": "Успешное прикрепление (no content)"
                     },
                     "400": {
-                        "description": "Невалидные UUID группы или медиа",
+                        "description": "Невалидные данные: пустой массив, неверный формат UUID",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Группа не найдена",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "Превышен лимит количества медиафайлов",
                         "schema": {
                             "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Ошибка привязки медиа",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/media/images": {
+            "get": {
+                "description": "Возвращает список всех загруженных изображений с метаданными",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Медиа"
+                ],
+                "summary": "Получить все изображения",
+                "responses": {
+                    "200": {
+                        "description": "Успешный ответ",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
                         "schema": {
                             "$ref": "#/definitions/response.ErrorResponse"
                         }
@@ -1047,6 +1060,61 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/galleries": {
+            "post": {
+                "description": "Создает новую галерею на основе переданных данных.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Галереи"
+                ],
+                "summary": "Создание новой галереи",
+                "parameters": [
+                    {
+                        "description": "Данные для создания галереи",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateGalleryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Галерея успешно создана, возвращает ID созданной галереи",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректные данные запроса",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Ошибка при создании галереи",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1068,6 +1136,25 @@ const docTemplate = `{
                         "gallery",
                         "attachment"
                     ]
+                }
+            }
+        },
+        "dto.AttachMediaRequest": {
+            "type": "object",
+            "required": [
+                "group_id",
+                "media_id"
+            ],
+            "properties": {
+                "group_id": {
+                    "type": "string"
+                },
+                "media_id": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -1111,9 +1198,21 @@ const docTemplate = `{
                     "type": "string",
                     "format": "uuid"
                 },
+                "featured_image_path": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string",
                     "format": "uuid"
+                },
+                "media_groups": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/definitions/dto.MediaItemResponse"
+                        }
+                    }
                 },
                 "metadata": {
                     "type": "object",
@@ -1184,6 +1283,51 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.CreateGalleryRequest": {
+            "type": "object",
+            "required": [
+                "author_id",
+                "title"
+            ],
+            "properties": {
+                "author_id": {
+                    "type": "string"
+                },
+                "cover_image_index": {
+                    "description": "Индекс изображения, используемого как обложка",
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "images": {
+                    "description": "Список изображений в галерее",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.MediaGroupResponse": {
             "type": "object",
             "properties": {
@@ -1195,6 +1339,23 @@ const docTemplate = `{
                     "format": "uuid"
                 },
                 "relation_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.MediaItemResponse": {
+            "type": "object",
+            "properties": {
+                "group_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "storage_path": {
                     "type": "string"
                 }
             }

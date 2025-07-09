@@ -51,4 +51,5 @@ type GalleryRepository interface {
 	UpdateGalleryStatus(ctx context.Context, id uuid.UUID, status string) error
 	DeleteGallery(ctx context.Context, id uuid.UUID) error
 	GetGalleryByID(ctx context.Context, id uuid.UUID) (models.Gallery, error)
+	GetGalleries(ctx context.Context, statusFilter string, page int, perPage int) ([]models.Gallery, int, error)
 }

@@ -19,7 +19,10 @@ type BlogService struct {
 }
 
 func NewBlogService(log *slog.Logger, repo repository.BlogRepository) *BlogService {
-	return &BlogService{log: log, repo: repo}
+	return &BlogService{
+		log:  log,
+		repo: repo,
+	}
 }
 
 // CreatePost создает новый пост с валидацией и обработкой slug

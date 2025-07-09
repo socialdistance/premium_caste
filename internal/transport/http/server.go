@@ -54,21 +54,32 @@ type BlogService interface {
 	GetPostMediaGroups(ctx context.Context, postID uuid.UUID, relationType string) (*dto.PostMediaGroupsResponse, error)
 }
 
-type Routers struct {
-	log          *slog.Logger
-	UserService  UserService
-	MediaService MediaService
-	AuthService  AuthService
-	BlogService  BlogService
+type GalleryService interface {
+	CreateGallery(ctx context.Context, req dto.CreateGalleryRequest) (uuid.UUID, error)
+	UpdateGallery(ctx context.Context, gallery models.Gallery) error
+	UpdateGalleryStatus(ctx context.Context, id uuid.UUID, status string) error
+	DeleteGallery(ctx context.Context, id uuid.UUID) error
+	GetGalleryByID(ctx context.Context, id uuid.UUID) (*dto.GalleryResponse, error)
+	GetGalleries(ctx context.Context, statusFilter string, page int, perPage int) ([]dto.GalleryResponse, int, error)
 }
 
-func NewRouter(log *slog.Logger, userService UserService, mediaService MediaService, authService AuthService, blogService BlogService) *Routers {
+type Routers struct {
+	log            *slog.Logger
+	UserService    UserService
+	MediaService   MediaService
+	AuthService    AuthService
+	BlogService    BlogService
+	GalleryService GalleryService
+}
+
+func NewRouter(log *slog.Logger, userService UserService, mediaService MediaService, authService AuthService, blogService BlogService, galleryService GalleryService) *Routers {
 	return &Routers{
-		log:          log,
-		UserService:  userService,
-		MediaService: mediaService,
-		AuthService:  authService,
-		BlogService:  blogService,
+		log:            log,
+		UserService:    userService,
+		MediaService:   mediaService,
+		AuthService:    authService,
+		BlogService:    blogService,
+		GalleryService: galleryService,
 	}
 }
 
@@ -77,6 +88,7 @@ var (
 	ErrUserExist          = errors.New("user already exist")
 	ErrUserNotFound       = errors.New("user not found")
 	ErrInvalidUUID        = errors.New("not valid UUID")
+	ErrGalleryNotFound    = errors.New("gallery not founc")
 )
 
 // Login godoc
@@ -410,7 +422,6 @@ func (r *Routers) UploadMedia(c echo.Context) error {
 //	}
 //
 // @Success 200 "Успешное прикрепление (no content)"
-// @Success 200 {object} response.SuccessResponse "Успешное прикрепление (с расширенным ответом)"
 // @Failure 400 {object} response.ErrorResponse "Невалидные данные: пустой массив, неверный формат UUID"
 // @Failure 404 {object} response.ErrorResponse "Группа не найдена"
 // @Failure 413 {object} response.ErrorResponse "Превышен лимит количества медиафайлов"
@@ -1039,4 +1050,163 @@ func (r *Routers) GetPostMediaGroups(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, resp)
+}
+
+// CreateGalleryHandler создает новую галерею.
+// @Summary Создание новой галереи
+// @Description Создает новую галерею на основе переданных данных.
+// @Tags Галереи
+// @Accept json
+// @Produce json
+// @Param request body dto.CreateGalleryRequest true "Данные для создания галереи"
+//
+//	{
+//	    "title": "test title gallery",
+//	    "slug": "test slug gallery",
+//	    "description": "test Description gallery",
+//	    "images": [
+//	        "uploads/1221067c-cc35-4dae-b5f5-feee4bbb3e22/test.png",
+//	        "uploads/1221067c-cc35-4dae-b5f5-feee4bbb3e22/test3.png"
+//	    ],
+//	    "cover_image_index": 1,
+//	    "author_id": "1221067c-cc35-4dae-b5f5-feee4bbb3e22",
+//	    "status": "draft",
+//	    "tags": ["test tags", "test tags"],
+//	    "metadata": {}
+//	}
+//
+// @Success 201 {object} map[string]string "Галерея успешно создана, возвращает ID созданной галереи"
+// @Failure 400 {object} map[string]string "Некорректные данные запроса"
+// @Failure 500 {object} map[string]string "Ошибка при создании галереи"
+// @Router /galleries [post]
+func (r *Routers) CreateGalleryHandler(c echo.Context) error {
+	const op = "http.routers.CreateGalleryHandler"
+
+	log := r.log.With(
+		slog.String("op", op),
+	)
+
+	var req dto.CreateGalleryRequest
+	if err := c.Bind(&req); err != nil {
+		log.Error("invalid request data", sl.Err(err))
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+	}
+
+	// Вызываем сервис
+	id, err := r.GalleryService.CreateGallery(c.Request().Context(), req)
+	if err != nil {
+		log.Error("error create gallery", sl.Err(err))
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusCreated, map[string]string{"id": id.String()})
+}
+
+// UpdateGalleryHandler обрабатывает запрос на обновление галереи
+func (r *Routers) UpdateGalleryHandler(c echo.Context) error {
+	var req dto.UpdateGalleryRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+	}
+
+	// Преобразуем DTO в модель
+	gallery := models.Gallery{
+		ID:          req.ID,
+		Title:       req.Title,
+		Slug:        req.Slug,
+		Description: req.Description,
+		Status:      req.Status,
+		Tags:        req.Tags,
+		Metadata:    req.Metadata,
+	}
+
+	// Вызываем сервис
+	err := r.GalleryService.UpdateGallery(c.Request().Context(), gallery)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "gallery updated successfully"})
+}
+
+// UpdateGalleryStatusHandler обрабатывает запрос на обновление статуса галереи
+func (r *Routers) UpdateGalleryStatusHandler(c echo.Context) error {
+	galleryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid gallery ID"})
+	}
+
+	var req dto.UpdateGalleryStatusRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+	}
+
+	// Вызываем сервис
+	err = r.GalleryService.UpdateGalleryStatus(c.Request().Context(), galleryID, req.Status)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "gallery status updated successfully"})
+}
+
+// DeleteGalleryHandler обрабатывает запрос на удаление галереи
+func (r *Routers) DeleteGalleryHandler(c echo.Context) error {
+	galleryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid gallery ID"})
+	}
+
+	// Вызываем сервис
+	err = r.GalleryService.DeleteGallery(c.Request().Context(), galleryID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "gallery deleted successfully"})
+}
+
+// GetGalleryByIDHandler обрабатывает запрос на получение галереи по ID
+func (r *Routers) GetGalleryByIDHandler(c echo.Context) error {
+	galleryID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid gallery ID"})
+	}
+
+	// Вызываем сервис
+	gallery, err := r.GalleryService.GetGalleryByID(c.Request().Context(), galleryID)
+	if err != nil {
+		if errors.Is(err, ErrGalleryNotFound) {
+			return c.JSON(http.StatusNotFound, map[string]string{"error": "gallery not found"})
+		}
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, gallery)
+}
+
+// GetGalleriesHandler обрабатывает запрос на получение списка галерей
+func (r *Routers) GetGalleriesHandler(c echo.Context) error {
+	statusFilter := c.QueryParam("status")
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
+
+	// Устанавливаем значения по умолчанию
+	if page <= 0 {
+		page = 1
+	}
+	if perPage <= 0 {
+		perPage = 10
+	}
+
+	// Вызываем сервис
+	galleries, total, err := r.GalleryService.GetGalleries(c.Request().Context(), statusFilter, page, perPage)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"galleries": galleries,
+		"total":     total,
+	})
 }

@@ -24,10 +24,11 @@ func NewRepository(ctx context.Context, dsn string, redis *redisapp.Client) (*Re
 	}
 
 	return &Repository{
-		User:  NewUserRepository(db),
-		Media: NewMediaRepository(db),
-		Token: NewRedisTokenRepo(redis),
-		Blog:  NewBlogRepository(db),
+		User:    NewUserRepository(db),
+		Media:   NewMediaRepository(db),
+		Token:   NewRedisTokenRepo(redis),
+		Blog:    NewBlogRepository(db),
+		Gallery: NewGalleryRepo(db),
 	}, nil
 }
 
