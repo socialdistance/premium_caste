@@ -31,6 +31,7 @@ type UserService interface {
 
 type MediaService interface {
 	UploadMedia(ctx context.Context, input dto.MediaUploadInput) (*models.Media, error)
+	UploadMultipleMedia(ctx context.Context, inputs []dto.MediaUploadInput) ([]*models.Media, error)
 	AttachMediaToGroup(ctx context.Context, groupID uuid.UUID, mediaIDs []uuid.UUID) error
 	AttachMedia(ctx context.Context, ownerID uuid.UUID, description string) (uuid.UUID, error)
 	ListGroupMedia(ctx context.Context, groupID uuid.UUID) ([]models.Media, error)
@@ -56,7 +57,7 @@ type BlogService interface {
 
 type GalleryService interface {
 	CreateGallery(ctx context.Context, req dto.CreateGalleryRequest) (uuid.UUID, error)
-	UpdateGallery(ctx context.Context, gallery models.Gallery) error
+	UpdateGallery(ctx context.Context, req dto.UpdateGalleryRequest) error
 	UpdateGalleryStatus(ctx context.Context, id uuid.UUID, status string) error
 	DeleteGallery(ctx context.Context, id uuid.UUID) error
 	GetGalleryByID(ctx context.Context, id uuid.UUID) (*dto.GalleryResponse, error)
@@ -403,6 +404,92 @@ func (r *Routers) UploadMedia(c echo.Context) error {
 		"duration", time.Since(startTime))
 
 	return c.JSON(http.StatusCreated, media)
+}
+
+// UploadMultipleMedia обрабатывает запрос на загрузку множества медиафайлов
+// UploadMultipleMedia godoc
+// @Summary Загрузка множества медиафайлов
+// @Description Загружает несколько медиафайлов на сервер. Поддерживает передачу файлов и общих параметров загрузки.
+// @Tags Медиа
+// @Accept multipart/form-data
+// @Produce json
+// @Param files formData file true "Файлы для загрузки (поддерживается множественная загрузка)"
+// @Param uploader_id formData string true "ID пользователя, загружающего файлы"
+// @Param media_type formData string true "Тип медиа (например, image, video)"
+// @Param is_public formData boolean true "Флаг публичности файла"
+// @Param metadata formData string false "Дополнительные метаданные (опционально)"
+// @Success 201 {array} models.Media "Успешная загрузка, возвращает массив созданных медиа-объектов"
+// @Failure 400 {object} map[string]string "Ошибка валидации входных данных"
+// @Failure 500 {object} map[string]string "Ошибка сервера при загрузке файлов"
+// @Router /api/v1/media/multiple [post]
+func (r *Routers) UploadMultipleMedia(c echo.Context) error {
+	const op = "http.routers.UploadMultipleMedia"
+
+	log := r.log.With(
+		slog.String("op", op),
+	)
+
+	startTime := time.Now()
+	defer func() {
+		log.Info("Request completed",
+			"duration", time.Since(startTime))
+	}()
+
+	log.Info("Start uploading multiple media",
+		"method", c.Request().Method,
+		"path", c.Path(),
+		"client_ip", c.RealIP())
+
+	// Получаем файлы из запроса
+	form, err := c.MultipartForm()
+	if err != nil {
+		log.Warn("Failed to parse multipart form",
+			"error", err.Error())
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid form data"})
+	}
+
+	files := form.File["files"]
+	if len(files) == 0 {
+		log.Warn("No files in request")
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "At least one file is required"})
+	}
+
+	log.Debug("Got files for upload",
+		"count", len(files))
+
+	// Парсим общие параметры загрузки
+	baseInput, err := r.parseMediaUploadInput(c)
+	if err != nil {
+		log.Warn("Error parsing base data",
+			"error", err.Error(),
+			"uploader_id", c.FormValue("uploader_id"))
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	// Подготавливаем входные данные для каждого файла
+	inputs := make([]dto.MediaUploadInput, 0, len(files))
+	for _, file := range files {
+		input := *baseInput
+		input.File = file
+		inputs = append(inputs, input)
+	}
+
+	// Выполняем загрузку через сервисный слой
+	medias, err := r.MediaService.UploadMultipleMedia(c.Request().Context(), inputs)
+	if err != nil {
+		log.Error("Error uploading multiple media",
+			"error", err.Error(),
+			"uploader_id", baseInput.UploaderID,
+			"file_count", len(files))
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	log.Info("Upload successful",
+		"media_count", len(medias),
+		"uploader_id", baseInput.UploaderID,
+		"duration", time.Since(startTime))
+
+	return c.JSON(http.StatusCreated, medias)
 }
 
 // AttachMediaToGroup godoc
@@ -1103,25 +1190,42 @@ func (r *Routers) CreateGalleryHandler(c echo.Context) error {
 }
 
 // UpdateGalleryHandler обрабатывает запрос на обновление галереи
+// UpdateGalleryHandler обновляет существующую галерею.
+// @Summary Обновление галереи
+// @Description Обновляет данные существующей галереи на основе переданных данных.
+// @Tags Галереи
+// @Accept json
+// @Produce json
+// @Param request body dto.UpdateGalleryRequest true "Данные для обновления галереи"
+//
+//	{
+//	    "id": "1221067c-cc35-4dae-b5f5-feee4bbb3e22",
+//	    "title": "updated test title gallery",
+//	    "slug": "updated-test-slug-gallery",
+//	    "description": "updated test Description gallery",
+//	    "images": [
+//	        "uploads/1221067c-cc35-4dae-b5f5-feee4bbb3e22/updated-test.png",
+//	        "uploads/1221067c-cc35-4dae-b5f5-feee4bbb3e22/updated-test3.png"
+//	    ],
+//	    "cover_image_index": 1,
+//	    "author_id": "1221067c-cc35-4dae-b5f5-feee4bbb3e22",
+//	    "status": "published",
+//	    "tags": ["updated test tags", "updated test tags"],
+//	    "metadata": {}
+//	}
+//
+// @Success 200 {object} map[string]string "Галерея успешно обновлена"
+// @Failure 400 {object} map[string]string "Некорректные данные запроса"
+// @Failure 500 {object} map[string]string "Ошибка при обновлении галереи"
+// @Router /galleries/{id} [put]
 func (r *Routers) UpdateGalleryHandler(c echo.Context) error {
 	var req dto.UpdateGalleryRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 	}
 
-	// Преобразуем DTO в модель
-	gallery := models.Gallery{
-		ID:          req.ID,
-		Title:       req.Title,
-		Slug:        req.Slug,
-		Description: req.Description,
-		Status:      req.Status,
-		Tags:        req.Tags,
-		Metadata:    req.Metadata,
-	}
-
 	// Вызываем сервис
-	err := r.GalleryService.UpdateGallery(c.Request().Context(), gallery)
+	err := r.GalleryService.UpdateGallery(c.Request().Context(), req)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
@@ -1129,6 +1233,23 @@ func (r *Routers) UpdateGalleryHandler(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"message": "gallery updated successfully"})
 }
 
+// UpdateGalleryStatusHandler обновляет статус галереи.
+// @Summary Обновление статуса галереи
+// @Description Обновляет статус существующей галереи на основе переданных данных.
+// @Tags Галереи
+// @Accept json
+// @Produce json
+// @Param id path string true "ID галереи"
+// @Param request body dto.UpdateGalleryStatusRequest true "Данные для обновления статуса галереи"
+//
+//	{
+//	    "status": "published"
+//	}
+//
+// @Success 200 {object} map[string]string "Статус галереи успешно обновлен"
+// @Failure 400 {object} map[string]string "Некорректные данные запроса"
+// @Failure 500 {object} map[string]string "Ошибка при обновлении статуса галереи"
+// @Router /galleries/{id}/status [put]
 // UpdateGalleryStatusHandler обрабатывает запрос на обновление статуса галереи
 func (r *Routers) UpdateGalleryStatusHandler(c echo.Context) error {
 	galleryID, err := uuid.Parse(c.Param("id"))
@@ -1150,6 +1271,17 @@ func (r *Routers) UpdateGalleryStatusHandler(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"message": "gallery status updated successfully"})
 }
 
+// DeleteGalleryHandler удаляет галерею.
+// @Summary Удаление галереи
+// @Description Удаляет существующую галерею по её ID.
+// @Tags Галереи
+// @Accept json
+// @Produce json
+// @Param id path string true "ID галереи"
+// @Success 200 {object} map[string]string "Галерея успешно удалена"
+// @Failure 400 {object} map[string]string "Некорректный ID галереи"
+// @Failure 500 {object} map[string]string "Ошибка при удалении галереи"
+// @Router /galleries/{id} [delete]
 // DeleteGalleryHandler обрабатывает запрос на удаление галереи
 func (r *Routers) DeleteGalleryHandler(c echo.Context) error {
 	galleryID, err := uuid.Parse(c.Param("id"))
@@ -1167,6 +1299,18 @@ func (r *Routers) DeleteGalleryHandler(c echo.Context) error {
 }
 
 // GetGalleryByIDHandler обрабатывает запрос на получение галереи по ID
+// GetGalleryByIDHandler возвращает галерею по её ID.
+// @Summary Получение галереи по ID
+// @Description Возвращает полную информацию о галерее по её уникальному идентификатору.
+// @Tags Галереи
+// @Accept json
+// @Produce json
+// @Param id path string true "UUID галереи" example("1221067c-cc35-4dae-b5f5-feee4bbb3e22")
+// @Success 200 {object} map[string]string "Успешный ответ с данными галереи"
+// @Failure 400 {object} map[string]string "Некорректный формат UUID"
+// @Failure 404 {object} map[string]string "Галерея не найдена"
+// @Failure 500 {object} map[string]string "Внутренняя ошибка сервера"
+// @Router /galleries/{id} [get]
 func (r *Routers) GetGalleryByIDHandler(c echo.Context) error {
 	galleryID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -1186,16 +1330,29 @@ func (r *Routers) GetGalleryByIDHandler(c echo.Context) error {
 }
 
 // GetGalleriesHandler обрабатывает запрос на получение списка галерей
+// GetGalleriesHandler возвращает список галерей с фильтрацией и пагинацией.
+// @Summary Получение списка галерей
+// @Description Возвращает список галерей с возможностью фильтрации по статусу и пагинацией.
+// @Tags Галереи
+// @Accept json
+// @Produce json
+// @Param status query string false "Фильтр по статусу галереи" example("published")
+// @Param page query int false "Номер страницы (по умолчанию: 1)" example(1)
+// @Param per_page query int false "Количество элементов на странице (по умолчанию: 10, максимум: 100)" example(10)
+// @Success 200 {object} map[string]interface{} "Успешный ответ с данными галерей и общим количеством"
+// @Failure 500 {object} map[string]string "Внутренняя ошибка сервера"
+// @Router /galleries [get]
 func (r *Routers) GetGalleriesHandler(c echo.Context) error {
 	statusFilter := c.QueryParam("status")
-	page, _ := strconv.Atoi(c.QueryParam("page"))
-	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
 
 	// Устанавливаем значения по умолчанию
-	if page <= 0 {
+	page, err := strconv.Atoi(c.QueryParam("page"))
+	if err != nil || page < 1 {
 		page = 1
 	}
-	if perPage <= 0 {
+
+	perPage, err := strconv.Atoi(c.QueryParam("per_page"))
+	if err != nil || perPage < 1 || perPage > 100 {
 		perPage = 10
 	}
 

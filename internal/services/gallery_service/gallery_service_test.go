@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"premium_caste/internal/domain/models"
+	"premium_caste/internal/transport/http/dto"
 	"testing"
 
 	"github.com/google/uuid"
@@ -52,7 +53,7 @@ func TestGalleryService_CreateGallery(t *testing.T) {
 	service := NewGalleryService(slog.Default(), mockRepo)
 
 	testUUID := uuid.New()
-	gallery := models.Gallery{
+	gallery := dto.CreateGalleryRequest{
 		Title:    "Test Gallery",
 		Slug:     "test-gallery",
 		AuthorID: uuid.New(),
@@ -60,7 +61,7 @@ func TestGalleryService_CreateGallery(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		gallery     models.Gallery
+		gallery     dto.CreateGalleryRequest
 		mockSetup   func()
 		wantError   bool
 		expectedErr string
@@ -76,7 +77,7 @@ func TestGalleryService_CreateGallery(t *testing.T) {
 		},
 		{
 			name:    "missing title",
-			gallery: models.Gallery{},
+			gallery: dto.CreateGalleryRequest{},
 			mockSetup: func() {
 				// Нет вызова репозитория, так как валидация происходит до него
 			},
@@ -120,14 +121,14 @@ func TestGalleryService_UpdateGallery(t *testing.T) {
 	mockRepo := new(MockGalleryRepository)
 	service := NewGalleryService(slog.Default(), mockRepo)
 
-	gallery := models.Gallery{
+	gallery := dto.UpdateGalleryRequest{
 		ID:    uuid.New(),
 		Title: "Updated Gallery",
 	}
 
 	tests := []struct {
 		name        string
-		gallery     models.Gallery
+		gallery     dto.UpdateGalleryRequest
 		mockSetup   func()
 		wantError   bool
 		expectedErr string
@@ -143,7 +144,7 @@ func TestGalleryService_UpdateGallery(t *testing.T) {
 		},
 		{
 			name:    "missing title",
-			gallery: models.Gallery{ID: uuid.New()},
+			gallery: dto.UpdateGalleryRequest{ID: uuid.New()},
 			mockSetup: func() {
 				// Нет вызова репозитория, так как валидация происходит до него
 			},

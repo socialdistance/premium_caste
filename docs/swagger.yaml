@@ -204,6 +204,44 @@ definitions:
         minLength: 3
         type: string
     type: object
+  dto.UpdateGalleryRequest:
+    properties:
+      cover_image_index:
+        description: Индекс изображения, используемого как обложка
+        type: integer
+      description:
+        type: string
+      id:
+        type: string
+      images:
+        description: Список изображений в галерее
+        items:
+          type: string
+        type: array
+      metadata:
+        additionalProperties: true
+        type: object
+      slug:
+        type: string
+      status:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+    required:
+    - id
+    - title
+    type: object
+  dto.UpdateGalleryStatusRequest:
+    properties:
+      status:
+        type: string
+    required:
+    - status
+    type: object
   dto.UserRegisterInput:
     properties:
       email:
@@ -493,6 +531,61 @@ paths:
           schema:
             $ref: '#/definitions/response.ErrorResponse'
       summary: Получить все изображения
+      tags:
+      - Медиа
+  /api/v1/media/multiple:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Загружает несколько медиафайлов на сервер. Поддерживает передачу
+        файлов и общих параметров загрузки.
+      parameters:
+      - description: Файлы для загрузки (поддерживается множественная загрузка)
+        in: formData
+        name: files
+        required: true
+        type: file
+      - description: ID пользователя, загружающего файлы
+        in: formData
+        name: uploader_id
+        required: true
+        type: string
+      - description: Тип медиа (например, image, video)
+        in: formData
+        name: media_type
+        required: true
+        type: string
+      - description: Флаг публичности файла
+        in: formData
+        name: is_public
+        required: true
+        type: boolean
+      - description: Дополнительные метаданные (опционально)
+        in: formData
+        name: metadata
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Успешная загрузка, возвращает массив созданных медиа-объектов
+          schema:
+            items:
+              $ref: '#/definitions/models.Media'
+            type: array
+        "400":
+          description: Ошибка валидации входных данных
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Ошибка сервера при загрузке файлов
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Загрузка множества медиафайлов
       tags:
       - Медиа
   /api/v1/media/upload:
@@ -1003,6 +1096,45 @@ paths:
       tags:
       - Пользователи
   /galleries:
+    get:
+      consumes:
+      - application/json
+      description: Возвращает список галерей с возможностью фильтрации по статусу
+        и пагинацией.
+      parameters:
+      - description: Фильтр по статусу галереи
+        example: '"published"'
+        in: query
+        name: status
+        type: string
+      - description: 'Номер страницы (по умолчанию: 1)'
+        example: 1
+        in: query
+        name: page
+        type: integer
+      - description: 'Количество элементов на странице (по умолчанию: 10, максимум:
+          100)'
+        example: 10
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешный ответ с данными галерей и общим количеством
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получение списка галерей
+      tags:
+      - Галереи
     post:
       consumes:
       - application/json
@@ -1036,6 +1168,158 @@ paths:
               type: string
             type: object
       summary: Создание новой галереи
+      tags:
+      - Галереи
+  /galleries/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Удаляет существующую галерею по её ID.
+      parameters:
+      - description: ID галереи
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Галерея успешно удалена
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Некорректный ID галереи
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Ошибка при удалении галереи
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Удаление галереи
+      tags:
+      - Галереи
+    get:
+      consumes:
+      - application/json
+      description: Возвращает полную информацию о галерее по её уникальному идентификатору.
+      parameters:
+      - description: UUID галереи
+        example: '"1221067c-cc35-4dae-b5f5-feee4bbb3e22"'
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешный ответ с данными галереи
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Некорректный формат UUID
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Галерея не найдена
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получение галереи по ID
+      tags:
+      - Галереи
+    put:
+      consumes:
+      - application/json
+      description: Обновляет данные существующей галереи на основе переданных данных.
+      parameters:
+      - description: Данные для обновления галереи
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateGalleryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Галерея успешно обновлена
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Некорректные данные запроса
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Ошибка при обновлении галереи
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обновление галереи
+      tags:
+      - Галереи
+  /galleries/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: Обновляет статус существующей галереи на основе переданных данных.
+      parameters:
+      - description: ID галереи
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Данные для обновления статуса галереи
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateGalleryStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Статус галереи успешно обновлен
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Некорректные данные запроса
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Ошибка при обновлении статуса галереи
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Обновление статуса галереи
       tags:
       - Галереи
 swagger: "2.0"

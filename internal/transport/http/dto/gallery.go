@@ -40,6 +40,7 @@ type UpdateGalleryRequest struct {
 	Title           string                 `json:"title" validate:"required"`
 	Slug            string                 `json:"slug"`
 	Description     string                 `json:"description"`
+	Images          []string               `json:"images"`            // Список изображений в галерее
 	CoverImageIndex int                    `json:"cover_image_index"` // Индекс изображения, используемого как обложка
 	Status          string                 `json:"status"`
 	Tags            []string               `json:"tags"`

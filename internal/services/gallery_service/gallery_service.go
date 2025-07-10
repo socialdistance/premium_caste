@@ -42,6 +42,7 @@ func (s *GalleryService) CreateGallery(ctx context.Context, req dto.CreateGaller
 	if len(req.Images) == 0 {
 		return uuid.Nil, fmt.Errorf("images are required")
 	}
+
 	if req.AuthorID == uuid.Nil {
 		return uuid.Nil, fmt.Errorf("author_id is required")
 	}
@@ -69,19 +70,42 @@ func (s *GalleryService) CreateGallery(ctx context.Context, req dto.CreateGaller
 }
 
 // UpdateGallery обновляет данные галереи
-func (s *GalleryService) UpdateGallery(ctx context.Context, gallery models.Gallery) error {
+func (s *GalleryService) UpdateGallery(ctx context.Context, req dto.UpdateGalleryRequest) error {
 	const op = "service.GalleryService.UpdateGallery"
 	log := s.log.With(
 		slog.String("op", op),
-		slog.String("gallery_id", gallery.ID.String()),
+		slog.String("gallery_id", req.ID.String()),
 	)
 
 	log.Info("updating gallery")
 
 	// Валидация данных галереи
-	if gallery.Title == "" {
+	if req.Title == "" {
 		log.Error("title is required")
 		return fmt.Errorf("title is required")
+	}
+
+	if req.Tags == nil {
+		req.Tags = []string{}
+	}
+
+	if req.Metadata == nil {
+		req.Metadata = map[string]interface{}{}
+	}
+
+	if len(req.Images) == 0 {
+		req.Images = []string{}
+	}
+
+	gallery := models.Gallery{
+		ID:          req.ID,
+		Title:       req.Title,
+		Slug:        req.Slug,
+		Images:      req.Images,
+		Description: req.Description,
+		Status:      req.Status,
+		Tags:        req.Tags,
+		Metadata:    req.Metadata,
 	}
 
 	err := s.repo.UpdateGallery(ctx, gallery)

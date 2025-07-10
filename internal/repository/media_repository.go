@@ -89,6 +89,97 @@ func (r *MediaRepo) CreateMedia(ctx context.Context, media *models.Media) (*mode
 	return &createdMedia, nil
 }
 
+// CreateMultipleMedia создает несколько записей медиа в базе данных
+func (r *MediaRepo) CreateMultipleMedia(ctx context.Context, medias []*models.Media) ([]*models.Media, error) {
+	const op = "repository.media_repository.CreateMultipleMedia"
+
+	// Проверяем наличие данных
+	if len(medias) == 0 {
+		return nil, fmt.Errorf("%s: no media provided", op)
+	}
+
+	// Подготавливаем запрос для массовой вставки
+	queryBuilder := r.sb.Insert("media").
+		Columns(
+			"id",
+			"uploader_id",
+			"created_at",
+			"media_type",
+			"original_filename",
+			"storage_path",
+			"file_size",
+			"mime_type",
+			"width",
+			"height",
+			"duration",
+			"is_public",
+			"metadata",
+		)
+
+	// Добавляем значения для каждого медиа
+	for _, media := range medias {
+		queryBuilder = queryBuilder.Values(
+			media.ID,
+			media.UploaderID,
+			media.CreatedAt,
+			media.MediaType,
+			media.OriginalFilename,
+			media.StoragePath,
+			media.FileSize,
+			media.MimeType,
+			media.Width,
+			media.Height,
+			media.Duration,
+			media.IsPublic,
+			media.Metadata,
+		)
+	}
+
+	query, args, err := queryBuilder.Suffix("RETURNING *").ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %s %w", op, err)
+	}
+
+	// Выполняем запрос
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query: %s %w", op, err)
+	}
+	defer rows.Close()
+
+	// Сканируем результаты
+	createdMedias := make([]*models.Media, 0, len(medias))
+	for rows.Next() {
+		var createdMedia models.Media
+		err := rows.Scan(
+			&createdMedia.ID,
+			&createdMedia.UploaderID,
+			&createdMedia.CreatedAt,
+			&createdMedia.MediaType,
+			&createdMedia.OriginalFilename,
+			&createdMedia.StoragePath,
+			&createdMedia.FileSize,
+			&createdMedia.MimeType,
+			&createdMedia.Width,
+			&createdMedia.Height,
+			&createdMedia.Duration,
+			&createdMedia.IsPublic,
+			&createdMedia.Metadata,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan row: %s %w", op, err)
+		}
+		createdMedias = append(createdMedias, &createdMedia)
+	}
+
+	// Проверяем ошибки после сканирования
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows error: %s %w", op, err)
+	}
+
+	return createdMedias, nil
+}
+
 func (r *MediaRepo) AddMediaGroup(ctx context.Context, ownerID uuid.UUID, description string) (uuid.UUID, error) {
 	const op = "repository.media_repository.AddMedia"
 

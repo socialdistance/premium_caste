@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"mime/multipart"
 	"path/filepath"
 
 	"premium_caste/internal/domain/models"
@@ -14,8 +15,9 @@ import (
 
 	"time"
 
-	"github.com/google/uuid"
 	"slices"
+
+	"github.com/google/uuid"
 )
 
 type MediaService struct {
@@ -32,6 +34,84 @@ func NewMediaService(log *slog.Logger, repo repository.MediaRepository, fileStor
 	}
 }
 
+func (s *MediaService) UploadMultipleMedia(ctx context.Context, inputs []dto.MediaUploadInput) ([]*models.Media, error) {
+	const op = "media_service.UploadMultipleMedia"
+
+	log := s.log.With(
+		slog.String("op", op),
+	)
+
+	log.Info("Upload multiple media", slog.Int("count", len(inputs)))
+
+	// Подготовка данных для хранения
+	var (
+		fileHeaders = make([]*multipart.FileHeader, 0, len(inputs))
+		uploaderID  = uuid.Nil
+	)
+
+	// Проверяем что все файлы от одного загрузчика
+	for _, input := range inputs {
+		if uploaderID == uuid.Nil {
+			uploaderID = input.UploaderID
+		} else if uploaderID != input.UploaderID {
+			return nil, fmt.Errorf("%s: all files must have same uploader ID", op)
+		}
+		fileHeaders = append(fileHeaders, input.File)
+	}
+
+	// Сохраняем файлы
+	paths, sizes, err := s.fileStorage.SaveMultiple(ctx, fileHeaders, filepath.Join("uploads", uploaderID.String()))
+	if err != nil {
+		log.Error("failed to save files", sl.Err(err))
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	// Создаем модели медиа
+	medias := make([]*models.Media, 0, len(inputs))
+	for i, input := range inputs {
+		media := &models.Media{
+			ID:               uuid.New(),
+			UploaderID:       input.UploaderID,
+			CreatedAt:        time.Now().UTC(),
+			MediaType:        models.MediaType(input.MediaType),
+			OriginalFilename: input.File.Filename,
+			StoragePath:      paths[i],
+			FileSize:         sizes[i],
+			MimeType:         input.File.Header.Get("Content-Type"),
+			Width:            input.Width,
+			Height:           input.Height,
+			Duration:         input.Duration,
+			IsPublic:         input.IsPublic,
+			Metadata:         input.CustomMetadata,
+		}
+
+		if err := media.Validate(); err != nil {
+			// Удаляем все сохраненные файлы при ошибке валидации
+			if cleanupErr := s.cleanupFiles(ctx, paths, log); cleanupErr != nil {
+				log.Error("failed to cleanup files after validation error",
+					sl.Err(err), sl.Err(cleanupErr))
+			}
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+
+		medias = append(medias, media)
+	}
+
+	// Сохраняем в базу данных
+
+	createdMedias, err := s.repo.CreateMultipleMedia(ctx, medias)
+	if err != nil {
+		// Удаляем все сохраненные файлы при ошибке базы данных
+		if cleanupErr := s.cleanupFiles(ctx, paths, log); cleanupErr != nil {
+			log.Error("failed to cleanup files after db error",
+				sl.Err(err), sl.Err(cleanupErr))
+		}
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return createdMedias, nil
+}
+
 func (s *MediaService) UploadMedia(ctx context.Context, input dto.MediaUploadInput) (*models.Media, error) {
 	const op = "media_service.UploadMedia"
 
@@ -40,7 +120,7 @@ func (s *MediaService) UploadMedia(ctx context.Context, input dto.MediaUploadInp
 		slog.String("media_type", input.MediaType),
 	)
 
-	// log.Info("Upload media")
+	log.Info("Upload media")
 
 	filePath, fileSize, err := s.fileStorage.Save(ctx, input.File, filepath.Join("uploads", input.UploaderID.String()))
 	if err != nil {
@@ -105,9 +185,9 @@ func (s *MediaService) AttachMediaToGroup(ctx context.Context, groupID uuid.UUID
 
 	// Проверка на нулевые UUID в массиве
 	if slices.Contains(mediaIDs, uuid.Nil) {
-			log.Info("mediaID cannot be nil", "op", op)
-			return fmt.Errorf("%s: mediaID cannot be nil", op)
-		}
+		log.Info("mediaID cannot be nil", "op", op)
+		return fmt.Errorf("%s: mediaID cannot be nil", op)
+	}
 
 	// Вызов репозитория с массивом mediaIDs
 	if err := s.repo.AddMediaGroupItems(ctx, groupID, mediaIDs); err != nil {
@@ -185,6 +265,21 @@ func (s *MediaService) cleanupFile(ctx context.Context, path string, log *slog.L
 	if err := s.fileStorage.Delete(ctx, path); err != nil {
 		log.Error("file deletion failed", slog.String("path", path), sl.Err(err))
 		return err
+	}
+	return nil
+}
+
+func (s *MediaService) cleanupFiles(ctx context.Context, paths []string, log *slog.Logger) error {
+	var errs []error
+	for _, path := range paths {
+		if err := s.fileStorage.Delete(ctx, path); err != nil {
+			errs = append(errs, err)
+			log.Error("failed to delete file",
+				slog.String("path", path), sl.Err(err))
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("multiple errors during cleanup: %v", errs)
 	}
 	return nil
 }

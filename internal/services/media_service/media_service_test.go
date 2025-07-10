@@ -59,6 +59,11 @@ func (m *MockMediaRepository) CreateMedia(ctx context.Context, media *models.Med
 	return args.Get(0).(*models.Media), args.Error(1)
 }
 
+func (m *MockMediaRepository) CreateMultipleMedia(ctx context.Context, medias []*models.Media) ([]*models.Media, error) {
+	args := m.Called(ctx, medias)
+	return args.Get(0).([]*models.Media), args.Error(1)
+}
+
 func (m *MockMediaRepository) GetAllImages(ctx context.Context) ([]models.Media, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {

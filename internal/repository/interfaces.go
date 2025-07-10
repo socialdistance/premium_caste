@@ -26,6 +26,7 @@ type TokenRepository interface {
 
 type MediaRepository interface {
 	CreateMedia(ctx context.Context, media *models.Media) (*models.Media, error)
+	CreateMultipleMedia(ctx context.Context, medias []*models.Media) ([]*models.Media, error)
 	AddMediaGroup(ctx context.Context, ownerID uuid.UUID, description string) (uuid.UUID, error)
 	AddMediaGroupItems(ctx context.Context, groupID uuid.UUID, mediaIDs []uuid.UUID) error
 	UpdateMedia(ctx context.Context, media *models.Media) error

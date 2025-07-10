@@ -275,6 +275,7 @@ func (s *Server) BuildRouters() {
 		mediaGroup.Use(s.jwtFromCookieMiddleware)
 		{
 			mediaGroup.POST("/upload", s.routers.UploadMedia)
+			mediaGroup.POST("/uploads", s.routers.UploadMultipleMedia)
 			mediaGroup.POST("/groups/attach", s.routers.AttachMediaToGroup)
 			mediaGroup.POST("/groups", s.routers.CreateMediaGroup)
 			mediaGroup.GET("/groups/group_id", s.routers.ListGroupMedia)
@@ -301,7 +302,7 @@ func (s *Server) BuildRouters() {
 		galleryGroup.Use(s.jwtFromCookieMiddleware)
 		{
 			galleryGroup.POST("/galleries", s.routers.CreateGalleryHandler, s.adminOnlyMiddleware)
-			galleryGroup.PUT("/galleries/:id", s.routers.UpdateGalleryHandler, s.adminOnlyMiddleware)
+			galleryGroup.PUT("/galleries", s.routers.UpdateGalleryHandler, s.adminOnlyMiddleware)
 			galleryGroup.PATCH("/galleries/:id/status", s.routers.UpdateGalleryStatusHandler, s.adminOnlyMiddleware)
 			galleryGroup.DELETE("/galleries/:id", s.routers.DeleteGalleryHandler, s.adminOnlyMiddleware)
 		}
