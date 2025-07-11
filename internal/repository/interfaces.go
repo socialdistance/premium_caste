@@ -53,4 +53,5 @@ type GalleryRepository interface {
 	DeleteGallery(ctx context.Context, id uuid.UUID) error
 	GetGalleryByID(ctx context.Context, id uuid.UUID) (models.Gallery, error)
 	GetGalleries(ctx context.Context, statusFilter string, page int, perPage int) ([]models.Gallery, int, error)
+	GetGalleriesByTags(ctx context.Context, tags []string, matchAll bool) ([]models.Gallery, error)
 }

@@ -218,6 +218,38 @@ func (s *GalleryService) GetGalleries(
 	return galleryResponses, total, nil
 }
 
+func (s *GalleryService) GetGalleriesByTags(ctx context.Context, tags []string, matchAll bool) ([]dto.GalleryResponse, error) {
+	const op = "service.TagService.GetGalleriesByTags"
+	log := s.log.With(
+		slog.String("op", op),
+		slog.Any("tags", tags),
+		slog.Bool("match_all", matchAll),
+	)
+
+	log.Info("getting galleries by tags")
+
+	// 1. Получаем галереи из репозитория
+	galleries, err := s.repo.GetGalleriesByTags(ctx, tags, matchAll)
+	if err != nil {
+		log.Error("failed to get galleries by tags",
+			slog.Any("err", err),
+			slog.Any("input_tags", tags),
+		)
+		return nil, fmt.Errorf("%s: failed to get galleries: %w", op, err)
+	}
+
+	// 2. Преобразуем модели в DTO
+	galleryResponses := make([]dto.GalleryResponse, 0, len(galleries))
+	for _, gallery := range galleries {
+		galleryResponses = append(galleryResponses, *s.mapToGalleryResponse(gallery))
+	}
+
+	log.Info("galleries by tags retrieved successfully",
+		slog.Int("count", len(galleryResponses)),
+	)
+	return galleryResponses, nil
+}
+
 // mapToGalleryResponse преобразует модель галереи в DTO
 func (s *GalleryService) mapToGalleryResponse(gallery models.Gallery) *dto.GalleryResponse {
 	return &dto.GalleryResponse{

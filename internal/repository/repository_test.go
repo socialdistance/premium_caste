@@ -1240,3 +1240,72 @@ func TestGalleryRepo_GetGalleries(t *testing.T) {
 		require.Empty(t, galleries)
 	})
 }
+
+func TestTagRepository_GetGalleriesByTags(t *testing.T) {
+	db := setupTestDB(t)
+	repo := repository.NewGalleryRepo(db)
+	testCtx := context.Background()
+
+	// Создаем тестовые галереи с разными тегами
+	gallery1 := models.Gallery{
+		Title:           "Gallery with tags",
+		Slug:            "gallery-with-tags",
+		Status:          "published",
+		AuthorID:        uuid.New(),
+		Images:          []string{"img1.jpg"},
+		CoverImageIndex: 0,
+		Tags:            []string{"nature", "landscape"},
+	}
+
+	gallery2 := models.Gallery{
+		Title:           "Gallery with single tag",
+		Slug:            "gallery-with-single-tag",
+		Status:          "published",
+		AuthorID:        uuid.New(),
+		Images:          []string{"img2.jpg"},
+		CoverImageIndex: 0,
+		Tags:            []string{"art"},
+	}
+
+	_, err := repo.CreateGallery(testCtx, gallery1)
+	require.NoError(t, err)
+	_, err = repo.CreateGallery(testCtx, gallery2)
+	require.NoError(t, err)
+
+	t.Run("filter with AND logic", func(t *testing.T) {
+		galleries, err := repo.GetGalleriesByTags(testCtx, []string{"nature", "landscape"}, true)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(galleries))
+		require.Equal(t, "gallery-with-tags", galleries[0].Slug)
+	})
+
+	t.Run("filter with OR logic", func(t *testing.T) {
+		galleries, err := repo.GetGalleriesByTags(testCtx, []string{"nature", "art"}, false)
+		require.NoError(t, err)
+		require.Equal(t, 2, len(galleries))
+	})
+
+	t.Run("no matching tags", func(t *testing.T) {
+		galleries, err := repo.GetGalleriesByTags(testCtx, []string{"unknown"}, true)
+		require.NoError(t, err)
+		require.Empty(t, galleries)
+	})
+
+	t.Run("empty tags list", func(t *testing.T) {
+		galleries, err := repo.GetGalleriesByTags(testCtx, []string{}, true)
+		require.NoError(t, err)
+		require.Equal(t, 2, len(galleries))
+	})
+
+	t.Run("partial match with AND logic", func(t *testing.T) {
+		galleries, err := repo.GetGalleriesByTags(testCtx, []string{"nature", "art"}, true)
+		require.NoError(t, err)
+		require.Empty(t, galleries)
+	})
+
+	t.Run("partial match with OR logic", func(t *testing.T) {
+		galleries, err := repo.GetGalleriesByTags(testCtx, []string{"nature", "art"}, false)
+		require.NoError(t, err)
+		require.Equal(t, 2, len(galleries))
+	})
+}

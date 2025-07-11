@@ -299,6 +299,7 @@ func (s *Server) BuildRouters() {
 		galleryGroup := api.Group("/gallery")
 		galleryGroup.GET("/galleries", s.routers.GetGalleriesHandler)
 		galleryGroup.GET("/galleries/:id", s.routers.GetGalleryByIDHandler)
+		galleryGroup.GET("/galleries/by-tags", s.routers.GetGalleriesByTagsHandler)
 		galleryGroup.Use(s.jwtFromCookieMiddleware)
 		{
 			galleryGroup.POST("/galleries", s.routers.CreateGalleryHandler, s.adminOnlyMiddleware)

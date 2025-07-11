@@ -62,6 +62,7 @@ type GalleryService interface {
 	DeleteGallery(ctx context.Context, id uuid.UUID) error
 	GetGalleryByID(ctx context.Context, id uuid.UUID) (*dto.GalleryResponse, error)
 	GetGalleries(ctx context.Context, statusFilter string, page int, perPage int) ([]dto.GalleryResponse, int, error)
+	GetGalleriesByTags(ctx context.Context, tags []string, matchAll bool) ([]dto.GalleryResponse, error)
 }
 
 type Routers struct {
@@ -1365,5 +1366,45 @@ func (r *Routers) GetGalleriesHandler(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"galleries": galleries,
 		"total":     total,
+	})
+}
+
+// GetGalleriesByTagsHandler обрабатывает запрос на получение списка галерей по тегам
+// GetGalleriesByTagsHandler возвращает список галерей, отфильтрованных по тегам.
+// @Summary Получение списка галерей по тегам
+// @Description Возвращает список галерей, отфильтрованных по указанным тегам, с возможностью выбора логики фильтрации (AND/OR).
+// @Tags Галереи
+// @Accept json
+// @Produce json
+// @Param tags query []string true "Список тегов для фильтрации" example(["nature", "art"])
+//
+//	GET /galleries/by-tags?tags=nature&tags=art&match_all=true
+//
+// @Param match_all query bool false "Режим фильтрации: true — AND, false — OR (по умолчанию: false)" example(false)
+// @Success 200 {object} map[string]interface{} "Успешный ответ с данными галерей"
+// @Failure 400 {object} map[string]string "Некорректный запрос"
+// @Failure 500 {object} map[string]string "Внутренняя ошибка сервера"
+// @Router /galleries/by-tags [get]
+func (r *Routers) GetGalleriesByTagsHandler(c echo.Context) error {
+	// Получаем список тегов из запроса
+	tags := c.QueryParams()["tags"]
+	if len(tags) == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "tags parameter is required"})
+	}
+
+	// Получаем режим фильтрации (AND/OR)
+	matchAll, err := strconv.ParseBool(c.QueryParam("match_all"))
+	if err != nil {
+		matchAll = false
+	}
+
+	// Вызываем сервис
+	galleries, err := r.GalleryService.GetGalleriesByTags(c.Request().Context(), tags, matchAll)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"galleries": galleries,
 	})
 }

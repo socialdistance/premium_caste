@@ -47,6 +47,11 @@ func (m *MockGalleryRepository) GetGalleries(ctx context.Context, statusFilter s
 	return args.Get(0).([]models.Gallery), args.Int(1), args.Error(2)
 }
 
+func (m *MockGalleryRepository) GetGalleriesByTags(ctx context.Context, tags []string, matchAll bool) ([]models.Gallery, error) {
+	args := m.Called(ctx, tags, matchAll)
+	return args.Get(0).([]models.Gallery), args.Error(1)
+}
+
 func TestGalleryService_CreateGallery(t *testing.T) {
 	ctx := context.Background()
 	mockRepo := new(MockGalleryRepository)
@@ -423,6 +428,98 @@ func TestGalleryService_GetGalleries(t *testing.T) {
 				assert.NotNil(t, resp)
 				assert.Equal(t, total, totalCount)
 				assert.Equal(t, len(galleries), len(resp))
+			}
+
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestTagService_GetGalleriesByTags(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(MockGalleryRepository)
+	service := NewGalleryService(slog.Default(), mockRepo)
+
+	gallery1 := models.Gallery{
+		ID:    uuid.New(),
+		Title: "Gallery with tags",
+		Tags:  []string{"nature", "landscape"},
+	}
+
+	gallery2 := models.Gallery{
+		ID:    uuid.New(),
+		Title: "Gallery with single tag",
+		Tags:  []string{"art"},
+	}
+
+	tests := []struct {
+		name      string
+		tags      []string
+		matchAll  bool
+		mockSetup func()
+		wantError bool
+		expected  []dto.GalleryResponse
+		errMsg    string
+	}{
+		{
+			name:     "successful retrieval with AND logic",
+			tags:     []string{"nature", "landscape"},
+			matchAll: true,
+			mockSetup: func() {
+				mockRepo.On("GetGalleriesByTags", ctx, []string{"nature", "landscape"}, true).
+					Return([]models.Gallery{gallery1}, nil).Once()
+			},
+			wantError: false,
+			expected:  []dto.GalleryResponse{*service.mapToGalleryResponse(gallery1)},
+		},
+		{
+			name:     "successful retrieval with OR logic",
+			tags:     []string{"nature", "art"},
+			matchAll: false,
+			mockSetup: func() {
+				mockRepo.On("GetGalleriesByTags", ctx, []string{"nature", "art"}, false).
+					Return([]models.Gallery{gallery1, gallery2}, nil).Once()
+			},
+			wantError: false,
+			expected:  []dto.GalleryResponse{*service.mapToGalleryResponse(gallery1), *service.mapToGalleryResponse(gallery2)},
+		},
+		{
+			name:     "repository error",
+			tags:     []string{"nature", "landscape"},
+			matchAll: true,
+			mockSetup: func() {
+				mockRepo.On("GetGalleriesByTags", ctx, []string{"nature", "landscape"}, true).
+					Return([]models.Gallery{}, errors.New("repository error")).Once()
+			},
+			wantError: true,
+			errMsg:    "failed to get galleries",
+		},
+		{
+			name:     "no matching tags",
+			tags:     []string{"unknown"},
+			matchAll: true,
+			mockSetup: func() {
+				mockRepo.On("GetGalleriesByTags", ctx, []string{"unknown"}, true).
+					Return([]models.Gallery{}, nil).Once()
+			},
+			wantError: false,
+			expected:  []dto.GalleryResponse{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mockSetup()
+
+			resp, err := service.GetGalleriesByTags(ctx, tt.tags, tt.matchAll)
+
+			if tt.wantError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+				assert.Nil(t, resp)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, resp)
 			}
 
 			mockRepo.AssertExpectations(t)

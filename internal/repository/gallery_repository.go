@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/lib/pq"
 )
 
 type GalleryRepo struct {
@@ -27,7 +28,6 @@ func NewGalleryRepo(db *pgxpool.Pool) *GalleryRepo {
 // CreateGallery создает новую галерею и возвращает её ID
 func (r *GalleryRepo) CreateGallery(ctx context.Context, gallery models.Gallery) (uuid.UUID, error) {
 	const op = "repository.GalleryRepo.CreateGallery"
-
 
 	query, args, err := r.sb.Insert("galleries").
 		Columns(
@@ -293,3 +293,161 @@ func (b *GalleryRepo) getTotalCount(ctx context.Context) (int, error) {
 
 	return count, nil
 }
+
+// GetGalleriesByTags возвращает галереи, отфильтрованные по тегам
+func (b *GalleryRepo) GetGalleriesByTags(
+	ctx context.Context,
+	tags []string, // Теги для фильтрации
+	matchAll bool, // true: AND-фильтр (все теги), false: OR-фильтр (любой из тегов)
+) ([]models.Gallery, error) {
+	const op = "repository.TagRepository.GetGalleriesByTags"
+
+	// Базовый запрос
+	queryBuilder := b.sb.Select(
+		"id", "title", "slug", "description", "images",
+		"cover_image_index", "author_id", "status",
+		"metadata", "tags", "created_at", "updated_at",
+	).From("galleries")
+
+	// Применяем фильтр по тегам
+	if len(tags) > 0 {
+		if matchAll {
+			// AND-условие: галерея должна содержать ВСЕ указанные теги
+			queryBuilder = queryBuilder.Where("tags @> ?", pq.Array(tags))
+		} else {
+			// OR-условие: галерея должна содержать ЛЮБОЙ из указанных тегов
+			queryBuilder = queryBuilder.Where("tags && ?", pq.Array(tags))
+		}
+	}
+
+	// Формируем SQL-запрос
+	query, args, err := queryBuilder.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	// Выполняем запрос
+	rows, err := b.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	defer rows.Close()
+
+	// Сканируем результаты
+	var galleries []models.Gallery
+	for rows.Next() {
+		var gallery models.Gallery
+		err := rows.Scan(
+			&gallery.ID,
+			&gallery.Title,
+			&gallery.Slug,
+			&gallery.Description,
+			&gallery.Images,
+			&gallery.CoverImageIndex,
+			&gallery.AuthorID,
+			&gallery.Status,
+			&gallery.Metadata,
+			&gallery.Tags,
+			&gallery.CreatedAt,
+			&gallery.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+		galleries = append(galleries, gallery)
+	}
+
+	return galleries, nil
+}
+
+// AddTags добавляет теги к галерее
+// func (b *GalleryRepo) AddTags(ctx context.Context, galleryID string, tags []string) error {
+// 	const op = "repository.TagRepository.AddTags"
+
+// 	query := `
+// 		UPDATE galleries
+// 		SET tags = array_cat(tags, $1)
+// 		WHERE id = $2
+// 	`
+
+// 	_, err := b.db.Exec(ctx, query, pq.Array(tags), galleryID)
+// 	if err != nil {
+// 		return fmt.Errorf("%s: %w", op, err)
+// 	}
+
+// 	return nil
+// }
+
+// // RemoveTags удаляет теги из галереи
+// func (b *GalleryRepo) RemoveTags(ctx context.Context, galleryID string, tags []string) error {
+// 	const op = "repository.TagRepository.RemoveTags"
+
+// 	query := `
+// 		UPDATE galleries
+// 		SET tags = array_remove(tags, unnest($1))
+// 		WHERE id = $2
+// 	`
+
+// 	_, err := b.db.Exec(ctx, query, pq.Array(tags), galleryID)
+// 	if err != nil {
+// 		return fmt.Errorf("%s: %w", op, err)
+// 	}
+
+// 	return nil
+// }
+
+// // UpdateTags полностью обновляет теги галереи
+// func (b *GalleryRepo) UpdateTags(ctx context.Context, galleryID string, tags []string) error {
+// 	const op = "repository.TagRepository.UpdateTags"
+
+// 	query := `
+// 		UPDATE galleries
+// 		SET tags = $1
+// 		WHERE id = $2
+// 	`
+
+// 	_, err := b.db.Exec(ctx, query, pq.Array(tags), galleryID)
+// 	if err != nil {
+// 		return fmt.Errorf("%s: %w", op, err)
+// 	}
+
+// 	return nil
+// }
+
+// // HasTags проверяет, содержит ли галерея указанные теги
+// func (b *GalleryRepo) HasTags(ctx context.Context, galleryID string, tags []string) (bool, error) {
+// 	const op = "repository.TagRepository.HasTags"
+
+// 	query := `
+// 		SELECT COUNT(*) > 0
+// 		FROM galleries
+// 		WHERE id = $1 AND tags @> $2
+// 	`
+
+// 	var hasTags bool
+// 	err := b.db.QueryRow(ctx, query, galleryID, pq.Array(tags)).Scan(&hasTags)
+// 	if err != nil {
+// 		return false, fmt.Errorf("%s: %w", op, err)
+// 	}
+
+// 	return hasTags, nil
+// }
+
+// // GetTags возвращает список тегов галереи
+// func (b *GalleryRepo) GetTags(ctx context.Context, galleryID string) ([]string, error) {
+// 	const op = "repository.TagRepository.GetTags"
+
+// 	query := `
+// 		SELECT tags
+// 		FROM galleries
+// 		WHERE id = $1
+// 	`
+
+// 	var tags []string
+// 	err := b.db.QueryRow(ctx, query, galleryID).Scan(pq.Array(&tags))
+// 	if err != nil {
+// 		return nil, fmt.Errorf("%s: %w", op, err)
+// 	}
+
+// 	return tags, nil
+// }
