@@ -306,6 +306,12 @@ func (s *Server) BuildRouters() {
 			galleryGroup.PUT("/galleries", s.routers.UpdateGalleryHandler, s.adminOnlyMiddleware)
 			galleryGroup.PATCH("/galleries/:id/status", s.routers.UpdateGalleryStatusHandler, s.adminOnlyMiddleware)
 			galleryGroup.DELETE("/galleries/:id", s.routers.DeleteGalleryHandler, s.adminOnlyMiddleware)
+
+			galleryGroup.POST("/galleries/:gallery_id/tags", s.routers.AddTagsHandler, s.adminOnlyMiddleware)
+			galleryGroup.DELETE("/galleries/:gallery_id/tags", s.routers.RemoveTagsHandler, s.adminOnlyMiddleware)
+			galleryGroup.PUT("/galleries/:gallery_id/tags", s.routers.ReplaceTagsHandler, s.adminOnlyMiddleware)
+			galleryGroup.GET("/galleries/:gallery_id/tags", s.routers.GetTagsHandler, s.adminOnlyMiddleware)
+			galleryGroup.GET("/galleries/:gallery_id/has-tags", s.routers.HasTagsHandler, s.adminOnlyMiddleware)
 		}
 	}
 }

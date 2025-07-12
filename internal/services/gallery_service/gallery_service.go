@@ -2,11 +2,13 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"premium_caste/internal/domain/models"
 	"premium_caste/internal/repository"
 	"premium_caste/internal/transport/http/dto"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -248,6 +250,187 @@ func (s *GalleryService) GetGalleriesByTags(ctx context.Context, tags []string, 
 		slog.Int("count", len(galleryResponses)),
 	)
 	return galleryResponses, nil
+}
+
+func (s *GalleryService) AddTags(ctx context.Context, galleryID string, tags []string) error {
+	const op = "service.GalleryService.AddTags"
+	log := s.log.With(
+		slog.String("op", op),
+		slog.String("galleryID", galleryID),
+		slog.Any("tags", tags),
+	)
+
+	log.Info("adding tags to gallery")
+
+	if err := validateGalleryID(galleryID); err != nil {
+		log.Error("invalid gallery ID", slog.Any("err", err))
+		return err
+	}
+
+	cleanedTags, err := normalizeTags(tags)
+	if err != nil {
+		log.Error("failed to normalize tags", slog.Any("err", err))
+		return err
+	}
+
+	if len(cleanedTags) == 0 {
+		log.Info("no tags to add")
+		return nil
+	}
+
+	if err := s.repo.AddTags(ctx, galleryID, cleanedTags); err != nil {
+		log.Error("failed to add tags", slog.Any("err", err))
+		return err
+	}
+
+	log.Info("tags added successfully")
+	return nil
+}
+
+func (s *GalleryService) RemoveTags(ctx context.Context, galleryID string, tagsToRemove []string) error {
+	const op = "service.GalleryService.RemoveTags"
+	log := s.log.With(
+		slog.String("op", op),
+		slog.String("galleryID", galleryID),
+		slog.Any("tagsToRemove", tagsToRemove),
+	)
+
+	log.Info("removing tags from gallery")
+
+	if err := validateGalleryID(galleryID); err != nil {
+		log.Error("invalid gallery ID", slog.Any("err", err))
+		return err
+	}
+
+	if len(tagsToRemove) == 0 {
+		log.Info("no tags to remove")
+		return nil
+	}
+
+	if err := s.repo.RemoveTags(ctx, galleryID, tagsToRemove); err != nil {
+		log.Error("failed to remove tags", slog.Any("err", err))
+		return err
+	}
+
+	log.Info("tags removed successfully")
+	return nil
+}
+
+func (s *GalleryService) ReplaceTags(ctx context.Context, galleryID string, newTags []string) error {
+	const op = "service.GalleryService.ReplaceTags"
+	log := s.log.With(
+		slog.String("op", op),
+		slog.String("galleryID", galleryID),
+		slog.Any("newTags", newTags),
+	)
+
+	log.Info("replacing tags in gallery")
+
+	if err := validateGalleryID(galleryID); err != nil {
+		log.Error("invalid gallery ID", slog.Any("err", err))
+		return err
+	}
+
+	cleanedTags, err := normalizeTags(newTags)
+	if err != nil {
+		log.Error("failed to normalize tags", slog.Any("err", err))
+		return err
+	}
+
+	if err := s.repo.UpdateTags(ctx, galleryID, cleanedTags); err != nil {
+		log.Error("failed to replace tags", slog.Any("err", err))
+		return err
+	}
+
+	log.Info("tags replaced successfully")
+	return nil
+}
+
+func (s *GalleryService) GetTags(ctx context.Context, galleryID string) ([]string, error) {
+	const op = "service.GalleryService.GetTags"
+	log := s.log.With(
+		slog.String("op", op),
+		slog.String("galleryID", galleryID),
+	)
+
+	log.Info("getting tags for gallery")
+
+	if err := validateGalleryID(galleryID); err != nil {
+		log.Error("invalid gallery ID", slog.Any("err", err))
+		return nil, err
+	}
+
+	tags, err := s.repo.GetTags(ctx, galleryID)
+	if err != nil {
+		log.Error("failed to get tags", slog.Any("err", err))
+		return nil, err
+	}
+
+	log.Info("tags retrieved successfully", slog.Int("count", len(tags)))
+	return tags, nil
+}
+
+func (s *GalleryService) HasTags(ctx context.Context, galleryID string, tags []string) (bool, error) {
+	const op = "service.GalleryService.HasTags"
+	log := s.log.With(
+		slog.String("op", op),
+		slog.String("galleryID", galleryID),
+		slog.Any("tags", tags),
+	)
+
+	log.Info("checking if gallery has tags")
+
+	if err := validateGalleryID(galleryID); err != nil {
+		log.Error("invalid gallery ID", slog.Any("err", err))
+		return false, err
+	}
+
+	if len(tags) == 0 {
+		log.Info("no tags to check")
+		return false, nil
+	}
+
+	hasTags, err := s.repo.HasTags(ctx, galleryID, tags)
+	if err != nil {
+		log.Error("failed to check tags", slog.Any("err", err))
+		return false, err
+	}
+
+	log.Info("tags check completed", slog.Bool("hasTags", hasTags))
+	return hasTags, nil
+}
+
+// validateGalleryID проверяет корректность UUID галереи
+func validateGalleryID(id string) error {
+	if _, err := uuid.Parse(id); err != nil {
+		return errors.New("некорректный идентификатор галереи")
+	}
+	return nil
+}
+
+// normalizeTags приводит теги к единому формату и валидирует их
+func normalizeTags(tags []string) ([]string, error) {
+	var result []string
+	seen := make(map[string]bool)
+
+	for _, tag := range tags {
+		trimmed := strings.TrimSpace(tag)
+		if trimmed == "" {
+			continue
+		}
+
+		if len(trimmed) > 50 {
+			return nil, errors.New("тег не может быть длиннее 50 символов")
+		}
+
+		lower := strings.ToLower(trimmed)
+		if !seen[lower] {
+			seen[lower] = true
+			result = append(result, lower)
+		}
+	}
+
+	return result, nil
 }
 
 // mapToGalleryResponse преобразует модель галереи в DTO

@@ -361,93 +361,95 @@ func (b *GalleryRepo) GetGalleriesByTags(
 }
 
 // AddTags добавляет теги к галерее
-// func (b *GalleryRepo) AddTags(ctx context.Context, galleryID string, tags []string) error {
-// 	const op = "repository.TagRepository.AddTags"
+func (b *GalleryRepo) AddTags(ctx context.Context, galleryID string, tags []string) error {
+	const op = "repository.TagRepository.AddTags"
 
-// 	query := `
-// 		UPDATE galleries
-// 		SET tags = array_cat(tags, $1)
-// 		WHERE id = $2
-// 	`
+	query := `
+		UPDATE galleries
+		SET tags = array_cat(tags, $1)
+		WHERE id = $2
+	`
 
-// 	_, err := b.db.Exec(ctx, query, pq.Array(tags), galleryID)
-// 	if err != nil {
-// 		return fmt.Errorf("%s: %w", op, err)
-// 	}
+	_, err := b.db.Exec(ctx, query, pq.Array(tags), galleryID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
 
-// 	return nil
-// }
+	return nil
+}
 
-// // RemoveTags удаляет теги из галереи
-// func (b *GalleryRepo) RemoveTags(ctx context.Context, galleryID string, tags []string) error {
-// 	const op = "repository.TagRepository.RemoveTags"
+// RemoveTags удаляет теги из галереи
+func (b *GalleryRepo) RemoveTags(ctx context.Context, galleryID string, tagsToRemove []string) error {
+	if len(tagsToRemove) == 0 {
+		return nil
+	}
 
-// 	query := `
-// 		UPDATE galleries
-// 		SET tags = array_remove(tags, unnest($1))
-// 		WHERE id = $2
-// 	`
+	for _, tag := range tagsToRemove {
+		_, err := b.db.Exec(ctx, `
+			UPDATE galleries 
+			SET tags = array_remove(tags, $1::varchar) 
+			WHERE id = $2
+		`, tag, galleryID)
+		if err != nil {
+			return fmt.Errorf("failed to remove tag %s: %w", tag, err)
+		}
+	}
 
-// 	_, err := b.db.Exec(ctx, query, pq.Array(tags), galleryID)
-// 	if err != nil {
-// 		return fmt.Errorf("%s: %w", op, err)
-// 	}
+	return nil
+}
 
-// 	return nil
-// }
+// UpdateTags полностью обновляет теги галереи
+func (b *GalleryRepo) UpdateTags(ctx context.Context, galleryID string, tags []string) error {
+	const op = "repository.TagRepository.UpdateTags"
 
-// // UpdateTags полностью обновляет теги галереи
-// func (b *GalleryRepo) UpdateTags(ctx context.Context, galleryID string, tags []string) error {
-// 	const op = "repository.TagRepository.UpdateTags"
+	query := `
+		UPDATE galleries
+		SET tags = $1
+		WHERE id = $2
+	`
 
-// 	query := `
-// 		UPDATE galleries
-// 		SET tags = $1
-// 		WHERE id = $2
-// 	`
+	_, err := b.db.Exec(ctx, query, pq.Array(tags), galleryID)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
 
-// 	_, err := b.db.Exec(ctx, query, pq.Array(tags), galleryID)
-// 	if err != nil {
-// 		return fmt.Errorf("%s: %w", op, err)
-// 	}
+	return nil
+}
 
-// 	return nil
-// }
+// HasTags проверяет, содержит ли галерея указанные теги
+func (b *GalleryRepo) HasTags(ctx context.Context, galleryID string, tags []string) (bool, error) {
+	const op = "repository.TagRepository.HasTags"
 
-// // HasTags проверяет, содержит ли галерея указанные теги
-// func (b *GalleryRepo) HasTags(ctx context.Context, galleryID string, tags []string) (bool, error) {
-// 	const op = "repository.TagRepository.HasTags"
+	query := `
+		SELECT COUNT(*) > 0
+		FROM galleries
+		WHERE id = $1 AND tags @> $2
+	`
 
-// 	query := `
-// 		SELECT COUNT(*) > 0
-// 		FROM galleries
-// 		WHERE id = $1 AND tags @> $2
-// 	`
+	var hasTags bool
+	err := b.db.QueryRow(ctx, query, galleryID, pq.Array(tags)).Scan(&hasTags)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", op, err)
+	}
 
-// 	var hasTags bool
-// 	err := b.db.QueryRow(ctx, query, galleryID, pq.Array(tags)).Scan(&hasTags)
-// 	if err != nil {
-// 		return false, fmt.Errorf("%s: %w", op, err)
-// 	}
+	return hasTags, nil
+}
 
-// 	return hasTags, nil
-// }
+// GetTags возвращает список тегов галереи
+func (b *GalleryRepo) GetTags(ctx context.Context, galleryID string) ([]string, error) {
+	const op = "repository.TagRepository.GetTags"
 
-// // GetTags возвращает список тегов галереи
-// func (b *GalleryRepo) GetTags(ctx context.Context, galleryID string) ([]string, error) {
-// 	const op = "repository.TagRepository.GetTags"
+	query := `
+		SELECT tags
+		FROM galleries
+		WHERE id = $1
+	`
 
-// 	query := `
-// 		SELECT tags
-// 		FROM galleries
-// 		WHERE id = $1
-// 	`
+	var tags []string
+	err := b.db.QueryRow(ctx, query, galleryID).Scan(pq.Array(&tags))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
 
-// 	var tags []string
-// 	err := b.db.QueryRow(ctx, query, galleryID).Scan(pq.Array(&tags))
-// 	if err != nil {
-// 		return nil, fmt.Errorf("%s: %w", op, err)
-// 	}
-
-// 	return tags, nil
-// }
+	return tags, nil
+}

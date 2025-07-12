@@ -54,4 +54,9 @@ type GalleryRepository interface {
 	GetGalleryByID(ctx context.Context, id uuid.UUID) (models.Gallery, error)
 	GetGalleries(ctx context.Context, statusFilter string, page int, perPage int) ([]models.Gallery, int, error)
 	GetGalleriesByTags(ctx context.Context, tags []string, matchAll bool) ([]models.Gallery, error)
+	AddTags(ctx context.Context, galleryID string, tags []string) error
+	RemoveTags(ctx context.Context, galleryID string, tagsToRemove []string) error
+	UpdateTags(ctx context.Context, galleryID string, tags []string) error
+	HasTags(ctx context.Context, galleryID string, tags []string) (bool, error)
+	GetTags(ctx context.Context, galleryID string) ([]string, error)
 }

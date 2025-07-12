@@ -1309,3 +1309,103 @@ func TestTagRepository_GetGalleriesByTags(t *testing.T) {
 		require.Equal(t, 2, len(galleries))
 	})
 }
+
+func TestGalleryRepo_TagsOperations(t *testing.T) {
+	db := setupTestDB(t)
+	repo := repository.NewGalleryRepo(db)
+	ctx := context.Background()
+
+	// Создаем тестовые галереи с разными тегами
+	gallery1 := models.Gallery{
+		Title:  "Nature Gallery",
+		Slug:   "nature-gallery",
+		Images: []string{"img2.jpg"},
+		Tags:   []string{"nature", "landscape"},
+	}
+
+	gallery2 := models.Gallery{
+		Title:  "Art Gallery",
+		Slug:   "art-gallery",
+		Images: []string{"img2.jpg"},
+		Tags:   []string{"art", "painting"},
+	}
+
+	gallery1ID, err := repo.CreateGallery(ctx, gallery1)
+	require.NoError(t, err)
+	gallery2ID, err := repo.CreateGallery(ctx, gallery2)
+	require.NoError(t, err)
+
+	t.Run("AddTags - добавление новых тегов", func(t *testing.T) {
+		err := repo.AddTags(ctx, gallery1ID.String(), []string{"sunset", "mountains"})
+		require.NoError(t, err)
+
+		tags, err := repo.GetTags(ctx, gallery1ID.String())
+		require.NoError(t, err)
+		require.ElementsMatch(t, []string{"nature", "landscape", "sunset", "mountains"}, tags)
+	})
+
+	t.Run("RemoveTags - удаление тегов", func(t *testing.T) {
+		// Удаляем тег
+		err = repo.RemoveTags(ctx, gallery2ID.String(), []string{"painting"})
+		require.NoError(t, err)
+
+		// Проверяем результат
+		updatedGallery, err := repo.GetGalleryByID(ctx, gallery2ID)
+		require.NoError(t, err)
+		require.NotContains(t, updatedGallery.Tags, "painting")
+		require.ElementsMatch(t, []string{"art"}, updatedGallery.Tags)
+	})
+
+	t.Run("UpdateTags - полное обновление тегов", func(t *testing.T) {
+		err := repo.UpdateTags(ctx, gallery1ID.String(), []string{"new", "tags"})
+		require.NoError(t, err)
+
+		tags, err := repo.GetTags(ctx, gallery1ID.String())
+		require.NoError(t, err)
+		require.ElementsMatch(t, []string{"new", "tags"}, tags)
+	})
+
+	t.Run("HasTags - проверка наличия тегов", func(t *testing.T) {
+		// Галерея содержит все указанные теги
+		has, err := repo.HasTags(ctx, gallery1ID.String(), []string{"new", "tags"})
+		require.NoError(t, err)
+		require.True(t, has)
+
+		// Галерея не содержит все указанные теги
+		has, err = repo.HasTags(ctx, gallery1ID.String(), []string{"new", "unknown"})
+		require.NoError(t, err)
+		require.False(t, has)
+
+		// Пустой список тегов всегда возвращает true
+		has, err = repo.HasTags(ctx, gallery1ID.String(), []string{})
+		require.NoError(t, err)
+		require.True(t, has)
+	})
+
+	t.Run("GetTags - получение тегов галереи", func(t *testing.T) {
+		tags, err := repo.GetTags(ctx, gallery2ID.String())
+		require.NoError(t, err)
+		require.ElementsMatch(t, []string{"art"}, tags)
+
+		// Несуществующая галерея
+		_, err = repo.GetTags(ctx, uuid.New().String())
+		require.Error(t, err)
+	})
+
+	t.Run("Edge cases - граничные случаи", func(t *testing.T) {
+		// Добавление пустого списка тегов
+		err := repo.AddTags(ctx, gallery1ID.String(), []string{})
+		require.NoError(t, err)
+
+		// Удаление несуществующих тегов
+		err = repo.RemoveTags(ctx, gallery1ID.String(), []string{"unknown"})
+		require.NoError(t, err)
+
+		// Обновление пустым списком тегов
+		err = repo.UpdateTags(ctx, gallery1ID.String(), []string{})
+		require.NoError(t, err)
+		tags, err := repo.GetTags(ctx, gallery1ID.String())
+		require.NoError(t, err)
+		require.Empty(t, tags)
+	})
+}

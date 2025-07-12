@@ -1239,6 +1239,363 @@
                 }
             }
         },
+        "/galleries/by-tags": {
+            "get": {
+                "description": "Возвращает список галерей, отфильтрованных по указанным тегам, с возможностью выбора логики фильтрации (AND/OR).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Галереи"
+                ],
+                "summary": "Получение списка галерей по тегам",
+                "parameters": [
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "example": "[\"nature\", \"art\"]",
+                        "description": "Список тегов для фильтрации",
+                        "name": "tags",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "example": false,
+                        "description": "Режим фильтрации: true — AND, false — OR (по умолчанию: false)",
+                        "name": "match_all",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешный ответ с данными галерей",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/galleries/{gallery_id}/has-tags": {
+            "get": {
+                "description": "Проверяет, содержит ли галерея все указанные теги",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Галереи"
+                ],
+                "summary": "Проверка наличия тегов у галереи",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11\"",
+                        "description": "Идентификатор галереи",
+                        "name": "gallery_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "example": "[\"art\", \"design\"]",
+                        "description": "Список тегов для проверки",
+                        "name": "tags",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Результат проверки",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/galleries/{gallery_id}/tags": {
+            "get": {
+                "description": "Возвращает список тегов для указанной галереи",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Галереи"
+                ],
+                "summary": "Получение тегов галереи",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11\"",
+                        "description": "Идентификатор галереи",
+                        "name": "gallery_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Список тегов галереи",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Полностью заменяет теги галереи на указанные",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Галереи"
+                ],
+                "summary": "Замена тегов галереи",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11\"",
+                        "description": "Идентификатор галереи",
+                        "name": "gallery_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "example": "[\"new\", \"tags\"]",
+                        "description": "Новый список тегов",
+                        "name": "tags",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Теги успешно заменены"
+                    },
+                    "400": {
+                        "description": "Некорректный запрос",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Добавляет указанные теги к галерее",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Галереи"
+                ],
+                "summary": "Добавление тегов к галерее",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11\"",
+                        "description": "Идентификатор галереи",
+                        "name": "gallery_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "example": "[\"art\", \"design\"]",
+                        "description": "Список тегов для добавления",
+                        "name": "tags",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Теги успешно добавлены"
+                    },
+                    "400": {
+                        "description": "Некорректный запрос",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Удаляет указанные теги из галереи",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Галереи"
+                ],
+                "summary": "Удаление тегов из галереи",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11\"",
+                        "description": "Идентификатор галереи",
+                        "name": "gallery_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "example": "[\"old\", \"tag\"]",
+                        "description": "Список тегов для удаления",
+                        "name": "tags",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Теги успешно удалены"
+                    },
+                    "400": {
+                        "description": "Некорректный запрос",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/galleries/{id}": {
             "get": {
                 "description": "Возвращает полную информацию о галерее по её уникальному идентификатору.",

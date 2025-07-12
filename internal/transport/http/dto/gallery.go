@@ -50,3 +50,7 @@ type UpdateGalleryRequest struct {
 type UpdateGalleryStatusRequest struct {
 	Status string `json:"status" validate:"required"`
 }
+
+type GalleryTagsRequest struct {
+	Tags []string `json:"tags"`
+}

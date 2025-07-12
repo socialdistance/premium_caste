@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"premium_caste/internal/domain/models"
 	"premium_caste/internal/transport/http/dto"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -50,6 +51,31 @@ func (m *MockGalleryRepository) GetGalleries(ctx context.Context, statusFilter s
 func (m *MockGalleryRepository) GetGalleriesByTags(ctx context.Context, tags []string, matchAll bool) ([]models.Gallery, error) {
 	args := m.Called(ctx, tags, matchAll)
 	return args.Get(0).([]models.Gallery), args.Error(1)
+}
+
+func (m *MockGalleryRepository) AddTags(ctx context.Context, galleryID string, tags []string) error {
+	args := m.Called(ctx, galleryID, tags)
+	return args.Error(0)
+}
+
+func (m *MockGalleryRepository) RemoveTags(ctx context.Context, galleryID string, tagsToRemove []string) error {
+	args := m.Called(ctx, galleryID, tagsToRemove)
+	return args.Error(0)
+}
+
+func (m *MockGalleryRepository) UpdateTags(ctx context.Context, galleryID string, tags []string) error {
+	args := m.Called(ctx, galleryID, tags)
+	return args.Error(0)
+}
+
+func (m *MockGalleryRepository) HasTags(ctx context.Context, galleryID string, tags []string) (bool, error) {
+	args := m.Called(ctx, galleryID, tags)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockGalleryRepository) GetTags(ctx context.Context, galleryID string) ([]string, error) {
+	args := m.Called(ctx, galleryID)
+	return args.Get(0).([]string), args.Error(1)
 }
 
 func TestGalleryService_CreateGallery(t *testing.T) {
@@ -520,6 +546,325 @@ func TestTagService_GetGalleriesByTags(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expected, resp)
+			}
+
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestService_AddTags(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(MockGalleryRepository)
+	service := NewGalleryService(slog.Default(), mockRepo)
+
+	testUUID := uuid.New().String()
+	validTags := []string{"art", "design"}
+	invalidTags := []string{strings.Repeat("a", 51)}
+
+	tests := []struct {
+		name        string
+		galleryID   string
+		tags        []string
+		mockSetup   func()
+		wantError   bool
+		expectedErr string
+	}{
+		{
+			name:      "successful add tags",
+			galleryID: testUUID,
+			tags:      validTags,
+			mockSetup: func() {
+				mockRepo.On("AddTags", ctx, testUUID, validTags).
+					Return(nil).Once()
+			},
+			wantError: false,
+		},
+		{
+			name:        "invalid gallery id",
+			galleryID:   "invalid-uuid",
+			tags:        validTags,
+			mockSetup:   func() {},
+			wantError:   true,
+			expectedErr: "некорректный идентификатор галереи",
+		},
+		{
+			name:        "tag too long",
+			galleryID:   testUUID,
+			tags:        invalidTags,
+			mockSetup:   func() {},
+			wantError:   true,
+			expectedErr: "тег не может быть длиннее 50 символов",
+		},
+		{
+			name:      "repository error",
+			galleryID: testUUID,
+			tags:      validTags,
+			mockSetup: func() {
+				mockRepo.On("AddTags", ctx, testUUID, validTags).
+					Return(errors.New("db error")).Once()
+			},
+			wantError:   true,
+			expectedErr: "db error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mockSetup()
+
+			err := service.AddTags(ctx, tt.galleryID, tt.tags)
+
+			if tt.wantError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestService_RemoveTags(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(MockGalleryRepository)
+	service := NewGalleryService(slog.Default(), mockRepo)
+
+	testUUID := uuid.New().String()
+	tagsToRemove := []string{"old", "tag"}
+
+	tests := []struct {
+		name        string
+		galleryID   string
+		tags        []string
+		mockSetup   func()
+		wantError   bool
+		expectedErr string
+	}{
+		{
+			name:      "successful remove tags",
+			galleryID: testUUID,
+			tags:      tagsToRemove,
+			mockSetup: func() {
+				mockRepo.On("RemoveTags", ctx, testUUID, tagsToRemove).
+					Return(nil).Once()
+			},
+			wantError: false,
+		},
+		{
+			name:        "invalid gallery id",
+			galleryID:   "invalid-uuid",
+			tags:        tagsToRemove,
+			mockSetup:   func() {},
+			wantError:   true,
+			expectedErr: "некорректный идентификатор галереи",
+		},
+		{
+			name:      "empty tags",
+			galleryID: testUUID,
+			tags:      []string{},
+			mockSetup: func() {},
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mockSetup()
+
+			err := service.RemoveTags(ctx, tt.galleryID, tt.tags)
+
+			if tt.wantError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestService_ReplaceTags(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(MockGalleryRepository)
+	service := NewGalleryService(slog.Default(), mockRepo)
+
+	testUUID := uuid.New().String()
+	newTags := []string{"new", "tags"}
+
+	tests := []struct {
+		name        string
+		galleryID   string
+		tags        []string
+		mockSetup   func()
+		wantError   bool
+		expectedErr string
+	}{
+		{
+			name:      "successful replace tags",
+			galleryID: testUUID,
+			tags:      newTags,
+			mockSetup: func() {
+				mockRepo.On("UpdateTags", ctx, testUUID, newTags).
+					Return(nil).Once()
+			},
+			wantError: false,
+		},
+		{
+			name:        "invalid gallery id",
+			galleryID:   "invalid-uuid",
+			tags:        newTags,
+			mockSetup:   func() {},
+			wantError:   true,
+			expectedErr: "некорректный идентификатор галереи",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mockSetup()
+
+			err := service.ReplaceTags(ctx, tt.galleryID, tt.tags)
+
+			if tt.wantError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestService_GetTags(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(MockGalleryRepository)
+	service := NewGalleryService(slog.Default(), mockRepo)
+
+	testUUID := uuid.New().String()
+	expectedTags := []string{"tag1", "tag2"}
+
+	tests := []struct {
+		name        string
+		galleryID   string
+		mockSetup   func()
+		expected    []string
+		wantError   bool
+		expectedErr string
+	}{
+		{
+			name:      "successful get tags",
+			galleryID: testUUID,
+			mockSetup: func() {
+				mockRepo.On("GetTags", ctx, testUUID).
+					Return(expectedTags, nil).Once()
+			},
+			expected:  expectedTags,
+			wantError: false,
+		},
+		{
+			name:        "invalid gallery id",
+			galleryID:   "invalid-uuid",
+			mockSetup:   func() {},
+			wantError:   true,
+			expectedErr: "некорректный идентификатор галереи",
+		},
+		{
+			name:      "repository error",
+			galleryID: testUUID,
+			mockSetup: func() {
+				mockRepo.On("GetTags", ctx, testUUID).
+					Return([]string{}, errors.New("db error")).Once()
+			},
+			wantError:   true,
+			expectedErr: "db error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mockSetup()
+
+			tags, err := service.GetTags(ctx, tt.galleryID)
+
+			if tt.wantError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+				assert.Empty(t, tags)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, tags)
+			}
+
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestService_HasTags(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(MockGalleryRepository)
+	service := NewGalleryService(slog.Default(), mockRepo)
+
+	testUUID := uuid.New().String()
+	tagsToCheck := []string{"required", "tag"}
+
+	tests := []struct {
+		name        string
+		galleryID   string
+		tags        []string
+		mockSetup   func()
+		expected    bool
+		wantError   bool
+		expectedErr string
+	}{
+		{
+			name:      "has all tags",
+			galleryID: testUUID,
+			tags:      tagsToCheck,
+			mockSetup: func() {
+				mockRepo.On("HasTags", ctx, testUUID, tagsToCheck).
+					Return(true, nil).Once()
+			},
+			expected:  true,
+			wantError: false,
+		},
+		{
+			name:        "invalid gallery id",
+			galleryID:   "invalid-uuid",
+			tags:        tagsToCheck,
+			mockSetup:   func() {},
+			wantError:   true,
+			expectedErr: "некорректный идентификатор галереи",
+		},
+		{
+			name:      "empty tags list",
+			galleryID: testUUID,
+			tags:      []string{},
+			mockSetup: func() {},
+			expected:  false,
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mockSetup()
+
+			hasTags, err := service.HasTags(ctx, tt.galleryID, tt.tags)
+
+			if tt.wantError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, hasTags)
 			}
 
 			mockRepo.AssertExpectations(t)

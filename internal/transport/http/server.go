@@ -63,6 +63,11 @@ type GalleryService interface {
 	GetGalleryByID(ctx context.Context, id uuid.UUID) (*dto.GalleryResponse, error)
 	GetGalleries(ctx context.Context, statusFilter string, page int, perPage int) ([]dto.GalleryResponse, int, error)
 	GetGalleriesByTags(ctx context.Context, tags []string, matchAll bool) ([]dto.GalleryResponse, error)
+	AddTags(ctx context.Context, galleryID string, tags []string) error
+	RemoveTags(ctx context.Context, galleryID string, tagsToRemove []string) error
+	ReplaceTags(ctx context.Context, galleryID string, newTags []string) error
+	GetTags(ctx context.Context, galleryID string) ([]string, error)
+	HasTags(ctx context.Context, galleryID string, tags []string) (bool, error)
 }
 
 type Routers struct {
@@ -1407,4 +1412,135 @@ func (r *Routers) GetGalleriesByTagsHandler(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"galleries": galleries,
 	})
+}
+
+// AddTagsHandler обрабатывает запрос на добавление тегов к галерее
+// @Summary Добавление тегов к галерее
+// @Description Добавляет указанные теги к галерее
+// @Tags Галереи
+// @Accept json
+// @Produce json
+// @Param gallery_id path string true "Идентификатор галереи" example("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")
+// @Param tags body []string true "Список тегов для добавления" example(["art", "design"])
+// @Success 204 "Теги успешно добавлены"
+// @Failure 400 {object} map[string]string "Некорректный запрос"
+// @Failure 500 {object} map[string]string "Внутренняя ошибка сервера"
+// @Router /galleries/{gallery_id}/tags [post]
+func (r *Routers) AddTagsHandler(c echo.Context) error {
+	galleryID := c.Param("gallery_id")
+
+	var tags dto.GalleryTagsRequest
+	if err := c.Bind(&tags); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+	}
+
+	if err := r.GalleryService.AddTags(c.Request().Context(), galleryID, tags.Tags); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+// RemoveTagsHandler обрабатывает запрос на удаление тегов из галереи
+// @Summary Удаление тегов из галереи
+// @Description Удаляет указанные теги из галереи
+// @Tags Галереи
+// @Accept json
+// @Produce json
+// @Param gallery_id path string true "Идентификатор галереи" example("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")
+// @Param tags body []string true "Список тегов для удаления" example(["old", "tag"])
+// @Success 204 "Теги успешно удалены"
+// @Failure 400 {object} map[string]string "Некорректный запрос"
+// @Failure 500 {object} map[string]string "Внутренняя ошибка сервера"
+// @Router /galleries/{gallery_id}/tags [delete]
+func (r *Routers) RemoveTagsHandler(c echo.Context) error {
+	galleryID := c.Param("gallery_id")
+
+	var tags dto.GalleryTagsRequest
+	if err := c.Bind(&tags); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+	}
+
+	if err := r.GalleryService.RemoveTags(c.Request().Context(), galleryID, tags.Tags); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+// ReplaceTagsHandler обрабатывает запрос на замену тегов галереи
+// @Summary Замена тегов галереи
+// @Description Полностью заменяет теги галереи на указанные
+// @Tags Галереи
+// @Accept json
+// @Produce json
+// @Param gallery_id path string true "Идентификатор галереи" example("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")
+// @Param tags body []string true "Новый список тегов" example(["new", "tags"])
+// @Success 204 "Теги успешно заменены"
+// @Failure 400 {object} map[string]string "Некорректный запрос"
+// @Failure 500 {object} map[string]string "Внутренняя ошибка сервера"
+// @Router /galleries/{gallery_id}/tags [put]
+func (r *Routers) ReplaceTagsHandler(c echo.Context) error {
+	galleryID := c.Param("gallery_id")
+
+	var tags dto.GalleryTagsRequest
+	if err := c.Bind(&tags); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+	}
+
+	if err := r.GalleryService.ReplaceTags(c.Request().Context(), galleryID, tags.Tags); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+// GetTagsHandler обрабатывает запрос на получение тегов галереи
+// @Summary Получение тегов галереи
+// @Description Возвращает список тегов для указанной галереи
+// @Tags Галереи
+// @Accept json
+// @Produce json
+// @Param gallery_id path string true "Идентификатор галереи" example("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")
+// @Success 200 {object} []string "Список тегов галереи"
+// @Failure 400 {object} map[string]string "Некорректный запрос"
+// @Failure 500 {object} map[string]string "Внутренняя ошибка сервера"
+// @Router /galleries/{gallery_id}/tags [get]
+func (r *Routers) GetTagsHandler(c echo.Context) error {
+	galleryID := c.Param("gallery_id")
+
+	tags, err := r.GalleryService.GetTags(c.Request().Context(), galleryID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, tags)
+}
+
+// HasTagsHandler обрабатывает запрос на проверку наличия тегов у галереи
+// @Summary Проверка наличия тегов у галереи
+// @Description Проверяет, содержит ли галерея все указанные теги
+// @Tags Галереи
+// @Accept json
+// @Produce json
+// @Param gallery_id path string true "Идентификатор галереи" example("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")
+// @Param tags query []string true "Список тегов для проверки" example(["art", "design"])
+// @Success 200 {object} bool "Результат проверки"
+// @Failure 400 {object} map[string]string "Некорректный запрос"
+// @Failure 500 {object} map[string]string "Внутренняя ошибка сервера"
+// @Router /galleries/{gallery_id}/has-tags [get]
+func (r *Routers) HasTagsHandler(c echo.Context) error {
+	galleryID := c.Param("gallery_id")
+	tags := c.QueryParams()["tags"]
+
+	if len(tags) == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "tags parameter is required"})
+	}
+
+	hasTags, err := r.GalleryService.HasTags(c.Request().Context(), galleryID, tags)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, hasTags)
 }

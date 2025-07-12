@@ -1170,6 +1170,205 @@ paths:
       summary: Создание новой галереи
       tags:
       - Галереи
+  /galleries/{gallery_id}/has-tags:
+    get:
+      consumes:
+      - application/json
+      description: Проверяет, содержит ли галерея все указанные теги
+      parameters:
+      - description: Идентификатор галереи
+        example: '"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"'
+        in: path
+        name: gallery_id
+        required: true
+        type: string
+      - collectionFormat: csv
+        description: Список тегов для проверки
+        example: '["art", "design"]'
+        in: query
+        items:
+          type: string
+        name: tags
+        required: true
+        type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Результат проверки
+          schema:
+            type: boolean
+        "400":
+          description: Некорректный запрос
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Проверка наличия тегов у галереи
+      tags:
+      - Галереи
+  /galleries/{gallery_id}/tags:
+    delete:
+      consumes:
+      - application/json
+      description: Удаляет указанные теги из галереи
+      parameters:
+      - description: Идентификатор галереи
+        example: '"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"'
+        in: path
+        name: gallery_id
+        required: true
+        type: string
+      - description: Список тегов для удаления
+        example: '["old", "tag"]'
+        in: body
+        name: tags
+        required: true
+        schema:
+          items:
+            type: string
+          type: array
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Теги успешно удалены
+        "400":
+          description: Некорректный запрос
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Удаление тегов из галереи
+      tags:
+      - Галереи
+    get:
+      consumes:
+      - application/json
+      description: Возвращает список тегов для указанной галереи
+      parameters:
+      - description: Идентификатор галереи
+        example: '"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"'
+        in: path
+        name: gallery_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список тегов галереи
+          schema:
+            items:
+              type: string
+            type: array
+        "400":
+          description: Некорректный запрос
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получение тегов галереи
+      tags:
+      - Галереи
+    post:
+      consumes:
+      - application/json
+      description: Добавляет указанные теги к галерее
+      parameters:
+      - description: Идентификатор галереи
+        example: '"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"'
+        in: path
+        name: gallery_id
+        required: true
+        type: string
+      - description: Список тегов для добавления
+        example: '["art", "design"]'
+        in: body
+        name: tags
+        required: true
+        schema:
+          items:
+            type: string
+          type: array
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Теги успешно добавлены
+        "400":
+          description: Некорректный запрос
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Добавление тегов к галерее
+      tags:
+      - Галереи
+    put:
+      consumes:
+      - application/json
+      description: Полностью заменяет теги галереи на указанные
+      parameters:
+      - description: Идентификатор галереи
+        example: '"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"'
+        in: path
+        name: gallery_id
+        required: true
+        type: string
+      - description: Новый список тегов
+        example: '["new", "tags"]'
+        in: body
+        name: tags
+        required: true
+        schema:
+          items:
+            type: string
+          type: array
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Теги успешно заменены
+        "400":
+          description: Некорректный запрос
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Замена тегов галереи
+      tags:
+      - Галереи
   /galleries/{id}:
     delete:
       consumes:
@@ -1320,6 +1519,50 @@ paths:
               type: string
             type: object
       summary: Обновление статуса галереи
+      tags:
+      - Галереи
+  /galleries/by-tags:
+    get:
+      consumes:
+      - application/json
+      description: Возвращает список галерей, отфильтрованных по указанным тегам,
+        с возможностью выбора логики фильтрации (AND/OR).
+      parameters:
+      - collectionFormat: csv
+        description: Список тегов для фильтрации
+        example: '["nature", "art"]'
+        in: query
+        items:
+          type: string
+        name: tags
+        required: true
+        type: array
+      - description: 'Режим фильтрации: true — AND, false — OR (по умолчанию: false)'
+        example: false
+        in: query
+        name: match_all
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешный ответ с данными галерей
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Некорректный запрос
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Получение списка галерей по тегам
       tags:
       - Галереи
 swagger: "2.0"
