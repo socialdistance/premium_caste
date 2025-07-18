@@ -23,7 +23,7 @@ import (
 )
 
 type UserService interface {
-	Login(ctx context.Context, c echo.Context, email, password string) (*models.TokenPair, error)
+	Login(ctx context.Context, email, password string) (*models.TokenPair, error)
 	RegisterNewUser(ctx context.Context, input dto.UserRegisterInput) (uuid.UUID, error)
 	IsAdmin(ctx context.Context, userID uuid.UUID) (bool, error)
 	GetUserById(ctx context.Context, userID uuid.UUID) (models.User, error)
@@ -128,7 +128,7 @@ func (r *Routers) Login(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, response.ErrInvalidRequestFormat)
 	}
 
-	token, err := r.UserService.Login(c.Request().Context(), c, req.Identifier, req.Password)
+	token, err := r.UserService.Login(c.Request().Context(), req.Identifier, req.Password)
 	if err != nil {
 		response.ErrAuthenticationFailed.Details = err.Error()
 		return c.JSON(http.StatusUnauthorized, response.ErrAuthenticationFailed)
@@ -137,6 +137,26 @@ func (r *Routers) Login(c echo.Context) error {
 	sess, _ := session.Get("session", c)
 	sess.Values["user_id"] = token.UserID
 	sess.Save(c.Request(), c.Response())
+
+	http.SetCookie(c.Response().Writer, &http.Cookie{
+		Name:     "access_token",
+		Value:    token.AccessToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Now().Add(24 * time.Hour),
+	})
+
+	http.SetCookie(c.Response().Writer, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    token.RefreshToken,
+		Path:     "/api/v1/refresh",
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Now().Add(7 * 24 * time.Hour),
+	})
 
 	return c.JSON(http.StatusOK, response.Response{
 		Status: "success",

@@ -49,6 +49,7 @@ func (s *TokenService) GenerateTokens(user models.User) (*models.TokenPair, erro
 	}
 
 	return &models.TokenPair{
+		UserID:       user.ID,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}, nil

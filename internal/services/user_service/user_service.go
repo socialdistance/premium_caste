@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
-	"time"
 
 	"premium_caste/internal/domain/models"
 	"premium_caste/internal/lib/logger/sl"
@@ -15,7 +13,6 @@ import (
 	"premium_caste/internal/transport/http/dto"
 
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -44,7 +41,7 @@ func NewUserService(log *slog.Logger, repo repository.UserRepository, authServic
 	}
 }
 
-func (u *UserService) Login(ctx context.Context, c echo.Context, identifier, password string) (*models.TokenPair, error) {
+func (u *UserService) Login(ctx context.Context, identifier, password string) (*models.TokenPair, error) {
 	const op = "user_service.Login"
 
 	log := u.log.With(
@@ -81,25 +78,25 @@ func (u *UserService) Login(ctx context.Context, c echo.Context, identifier, pas
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	http.SetCookie(c.Response().Writer, &http.Cookie{
-		Name:     "access_token",
-		Value:    token.AccessToken,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   false,
-		SameSite: http.SameSiteStrictMode,
-		Expires:  time.Now().Add(24 * time.Hour),
-	})
+	// http.SetCookie(c.Response().Writer, &http.Cookie{
+	// 	Name:     "access_token",
+	// 	Value:    token.AccessToken,
+	// 	Path:     "/",
+	// 	HttpOnly: true,
+	// 	Secure:   false,
+	// 	SameSite: http.SameSiteStrictMode,
+	// 	Expires:  time.Now().Add(24 * time.Hour),
+	// })
 
-	http.SetCookie(c.Response().Writer, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    token.RefreshToken,
-		Path:     "/api/v1/refresh",
-		HttpOnly: true,
-		Secure:   false,
-		SameSite: http.SameSiteStrictMode,
-		Expires:  time.Now().Add(7 * 24 * time.Hour),
-	})
+	// http.SetCookie(c.Response().Writer, &http.Cookie{
+	// 	Name:     "refresh_token",
+	// 	Value:    token.RefreshToken,
+	// 	Path:     "/api/v1/refresh",
+	// 	HttpOnly: true,
+	// 	Secure:   false,
+	// 	SameSite: http.SameSiteStrictMode,
+	// 	Expires:  time.Now().Add(7 * 24 * time.Hour),
+	// })
 
 	token.UserID = user.ID
 
