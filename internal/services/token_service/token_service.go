@@ -75,9 +75,9 @@ func (s *TokenService) RefreshTokens(refreshToken string) (*models.TokenPair, er
 		return nil, ErrInvalidToken
 	}
 
-	if err := s.repo.DeleteRefreshToken(context.Background(), userID, refreshToken); err != nil {
-		return nil, err
-	}
+	// if err := s.repo.DeleteRefreshToken(context.Background(), userID, refreshToken); err != nil {
+	// 	return nil, err
+	// }
 
 	user := models.User{
 		ID:    uuid.MustParse(userID),
