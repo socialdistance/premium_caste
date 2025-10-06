@@ -251,6 +251,26 @@ func (r *Routers) Refresh(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "invalid refresh token")
 	}
 
+	http.SetCookie(c.Response().Writer, &http.Cookie{
+		Name:     "access_token",
+		Value:    newTokens.AccessToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Now().Add(24 * time.Hour),
+	})
+
+	http.SetCookie(c.Response().Writer, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    newTokens.RefreshToken,
+		Path:     "/api/v1/refresh",
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Now().Add(7 * 24 * time.Hour),
+	})
+
 	return c.JSON(http.StatusOK, newTokens)
 }
 
