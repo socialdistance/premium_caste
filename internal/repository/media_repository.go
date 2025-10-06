@@ -403,10 +403,30 @@ func (r *MediaRepo) GetMediaByGroupID(ctx context.Context, groupID uuid.UUID) ([
 }
 
 // GetAllImages возвращает все загруженные картинки (медиа типа 'photo')
-func (r *MediaRepo) GetAllImages(ctx context.Context) ([]models.Media, error) {
+func (r *MediaRepo) GetAllImages(ctx context.Context, limit int) ([]models.Media, error) {
 	const op = "repository.media_repository.GetAllImages"
 
-	query, args, err := r.sb.
+	// query, args, err := r.sb.
+	// 	Select(
+	// 		"id",
+	// 		"uploader_id",
+	// 		"created_at",
+	// 		"original_filename",
+	// 		"storage_path",
+	// 		"file_size",
+	// 		"width",
+	// 		"height",
+	// 		"is_public",
+	// 		"metadata",
+	// 	).
+	// 	From("media").
+	// 	OrderBy("created_at DESC").
+	// 	ToSql()
+	// if err != nil {
+	// 	return nil, fmt.Errorf("%s: failed to build query: %w", op, err)
+	// }
+
+	queryBuilder := r.sb.
 		Select(
 			"id",
 			"uploader_id",
@@ -420,8 +440,14 @@ func (r *MediaRepo) GetAllImages(ctx context.Context) ([]models.Media, error) {
 			"metadata",
 		).
 		From("media").
-		OrderBy("created_at DESC").
-		ToSql()
+		OrderBy("created_at DESC")
+
+	// Добавляем LIMIT, если значение больше 0
+	if limit > 0 {
+		queryBuilder = queryBuilder.Limit(uint64(limit))
+	}
+
+	query, args, err := queryBuilder.ToSql()
 	if err != nil {
 		return nil, fmt.Errorf("%s: failed to build query: %w", op, err)
 	}

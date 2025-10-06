@@ -18,12 +18,14 @@ import (
 	"slices"
 
 	"github.com/google/uuid"
+	"github.com/patrickmn/go-cache"
 )
 
 type MediaService struct {
 	log         *slog.Logger
 	repo        repository.MediaRepository
 	fileStorage storage.FileStorage
+	cache       *cache.Cache
 }
 
 func NewMediaService(log *slog.Logger, repo repository.MediaRepository, fileStorage storage.FileStorage) *MediaService {
@@ -31,6 +33,7 @@ func NewMediaService(log *slog.Logger, repo repository.MediaRepository, fileStor
 		log:         log,
 		repo:        repo,
 		fileStorage: fileStorage,
+		cache:       cache.New(5*time.Minute, 10*time.Minute), // Кеш с TTL 5 минут и очисткой каждые 10 минут
 	}
 }
 
@@ -284,19 +287,50 @@ func (s *MediaService) cleanupFiles(ctx context.Context, paths []string, log *sl
 	return nil
 }
 
-// TODO: добавить кеш
-func (s *MediaService) GetAllImages(ctx context.Context) ([]models.Media, error) {
+func (s *MediaService) GetAllImages(ctx context.Context, limit int) ([]models.Media, error) {
 	const op = "media_service.GetAllImages"
 
 	log := s.log.With(
 		"op", op,
 	)
 
-	media, err := s.repo.GetAllImages(ctx)
-	if err != nil {
-		log.Error("failed get media: %s %w", op, sl.Err(err))
-		return []models.Media{}, fmt.Errorf("failed get media list: %s %s", op, sl.Err(err))
+	// Формируем ключ для кеша на основе параметров
+	cacheKey := fmt.Sprintf("all_images:%d", limit)
+
+	// Пытаемся получить данные из кеша
+	if cachedData, found := s.cache.Get(cacheKey); found {
+		log.Info("cache hit", "key", cacheKey)
+		return cachedData.([]models.Media), nil
 	}
+
+	log.Info("cache miss", "key", cacheKey)
+
+	// Если данных нет в кеше, запрашиваем их из репозитория
+	media, err := s.repo.GetAllImages(ctx, limit)
+	if err != nil {
+		log.Error("failed get media", "op", op, "error", sl.Err(err))
+		return []models.Media{}, fmt.Errorf("failed get media list: %s %w", op, err)
+	}
+
+	// Сохраняем данные в кеш
+	s.cache.Set(cacheKey, media, cache.DefaultExpiration)
 
 	return media, nil
 }
+
+// TODO: добавить кеш
+// func (s *MediaService) GetAllImages(ctx context.Context, limit int) ([]models.Media, error) {
+// 	const op = "media_service.GetAllImages"
+
+// 	log := s.log.With(
+// 		"op", op,
+// 	)
+
+// 	media, err := s.repo.GetAllImages(ctx, limit)
+// 	if err != nil {
+// 		log.Error("failed get media: %s %w", op, sl.Err(err))
+// 		return []models.Media{}, fmt.Errorf("failed get media list: %s %s", op, sl.Err(err))
+// 	}
+
+// 	return media, nil
+// }
