@@ -145,7 +145,7 @@ func (r *Routers) Login(c echo.Context) error {
 		HttpOnly: true,
 		Secure:   false,
 		SameSite: http.SameSiteStrictMode,
-		Expires:  time.Now().Add(24 * time.Hour),
+		Expires:  time.Now().Add(7 * 24 * time.Hour),
 	})
 
 	http.SetCookie(c.Response().Writer, &http.Cookie{
@@ -258,7 +258,7 @@ func (r *Routers) Refresh(c echo.Context) error {
 		HttpOnly: true,
 		Secure:   false,
 		SameSite: http.SameSiteStrictMode,
-		Expires:  time.Now().Add(24 * time.Hour),
+		Expires:  time.Now().Add(7 * 24 * time.Hour),
 	})
 
 	http.SetCookie(c.Response().Writer, &http.Cookie{
