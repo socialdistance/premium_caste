@@ -287,7 +287,7 @@ func (s *MediaService) cleanupFiles(ctx context.Context, paths []string, log *sl
 	return nil
 }
 
-func (s *MediaService) GetAllImages(ctx context.Context, limit int) ([]models.Media, error) {
+func (s *MediaService) GetAllImages(ctx context.Context, limit int) ([]models.Media, int, error) {
 	const op = "media_service.GetAllImages"
 
 	log := s.log.With(
@@ -300,22 +300,22 @@ func (s *MediaService) GetAllImages(ctx context.Context, limit int) ([]models.Me
 	// Пытаемся получить данные из кеша
 	if cachedData, found := s.cache.Get(cacheKey); found {
 		log.Info("cache hit", "key", cacheKey)
-		return cachedData.([]models.Media), nil
+		return cachedData.([]models.Media), 0, nil
 	}
 
 	log.Info("cache miss", "key", cacheKey)
 
 	// Если данных нет в кеше, запрашиваем их из репозитория
-	media, err := s.repo.GetAllImages(ctx, limit)
+	media, total, err := s.repo.GetAllImages(ctx, limit)
 	if err != nil {
 		log.Error("failed get media", "op", op, "error", sl.Err(err))
-		return []models.Media{}, fmt.Errorf("failed get media list: %s %w", op, err)
+		return []models.Media{}, 0, fmt.Errorf("failed get media list: %s %w", op, err)
 	}
 
 	// Сохраняем данные в кеш
 	s.cache.Set(cacheKey, media, cache.DefaultExpiration)
 
-	return media, nil
+	return media, total, nil
 }
 
 // TODO: добавить кеш

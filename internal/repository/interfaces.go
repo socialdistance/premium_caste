@@ -32,7 +32,7 @@ type MediaRepository interface {
 	UpdateMedia(ctx context.Context, media *models.Media) error
 	FindByID(ctx context.Context, id uuid.UUID) (*models.Media, error)
 	GetMediaByGroupID(ctx context.Context, groupID uuid.UUID) ([]models.Media, error)
-	GetAllImages(ctx context.Context, limit int) ([]models.Media, error)
+	GetAllImages(ctx context.Context, limit int) ([]models.Media, int, error)
 }
 
 type BlogRepository interface {

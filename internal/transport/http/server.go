@@ -35,7 +35,7 @@ type MediaService interface {
 	AttachMediaToGroup(ctx context.Context, groupID uuid.UUID, mediaIDs []uuid.UUID) error
 	AttachMedia(ctx context.Context, ownerID uuid.UUID, description string) (uuid.UUID, error)
 	ListGroupMedia(ctx context.Context, groupID uuid.UUID) ([]models.Media, error)
-	GetAllImages(ctx context.Context, limitInt int) ([]models.Media, error)
+	GetAllImages(ctx context.Context, limit int) ([]models.Media, int, error)
 }
 
 type AuthService interface {
@@ -798,7 +798,7 @@ func (r *Routers) GetAllImages(c echo.Context) error {
 		}
 	}
 
-	media, err := r.MediaService.GetAllImages(c.Request().Context(), limitInt)
+	media, total, err := r.MediaService.GetAllImages(c.Request().Context(), limitInt)
 	if err != nil {
 		log.Error("failed get images", sl.Err(err))
 		return c.JSON(http.StatusInternalServerError, response.ErrorResponse{
@@ -807,7 +807,8 @@ func (r *Routers) GetAllImages(c echo.Context) error {
 	}
 
 	response := map[string]interface{}{
-		"data": media,
+		"data":  media,
+		"total": total,
 		"meta": map[string]interface{}{
 			"count": len(media),
 		},

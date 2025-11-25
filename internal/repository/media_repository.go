@@ -403,29 +403,25 @@ func (r *MediaRepo) GetMediaByGroupID(ctx context.Context, groupID uuid.UUID) ([
 }
 
 // GetAllImages возвращает все загруженные картинки (медиа типа 'photo')
-func (r *MediaRepo) GetAllImages(ctx context.Context, limit int) ([]models.Media, error) {
+func (r *MediaRepo) GetAllImages(ctx context.Context, limit int) ([]models.Media, int, error) {
 	const op = "repository.media_repository.GetAllImages"
 
-	// query, args, err := r.sb.
-	// 	Select(
-	// 		"id",
-	// 		"uploader_id",
-	// 		"created_at",
-	// 		"original_filename",
-	// 		"storage_path",
-	// 		"file_size",
-	// 		"width",
-	// 		"height",
-	// 		"is_public",
-	// 		"metadata",
-	// 	).
-	// 	From("media").
-	// 	OrderBy("created_at DESC").
-	// 	ToSql()
-	// if err != nil {
-	// 	return nil, fmt.Errorf("%s: failed to build query: %w", op, err)
-	// }
+	// Запрос для получения общего количества записей
+	countQuery, _, err := r.sb.
+		Select("COUNT(*)").
+		From("media").
+		ToSql()
+	if err != nil {
+		return nil, 0, fmt.Errorf("%s: failed to build count query: %w", op, err)
+	}
 
+	var totalCount int
+	err = r.db.QueryRow(ctx, countQuery).Scan(&totalCount)
+	if err != nil {
+		return nil, 0, fmt.Errorf("%s: failed to execute count query: %w", op, err)
+	}
+
+	// Запрос для получения данных
 	queryBuilder := r.sb.
 		Select(
 			"id",
@@ -442,19 +438,18 @@ func (r *MediaRepo) GetAllImages(ctx context.Context, limit int) ([]models.Media
 		From("media").
 		OrderBy("created_at DESC")
 
-	// Добавляем LIMIT, если значение больше 0
 	if limit > 0 {
 		queryBuilder = queryBuilder.Limit(uint64(limit))
 	}
 
 	query, args, err := queryBuilder.ToSql()
 	if err != nil {
-		return nil, fmt.Errorf("%s: failed to build query: %w", op, err)
+		return nil, 0, fmt.Errorf("%s: failed to build query: %w", op, err)
 	}
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("%s: failed to execute query: %w", op, err)
+		return nil, 0, fmt.Errorf("%s: failed to execute query: %w", op, err)
 	}
 	defer rows.Close()
 
@@ -475,14 +470,14 @@ func (r *MediaRepo) GetAllImages(ctx context.Context, limit int) ([]models.Media
 			&img.Metadata,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("%s: failed to scan row: %w", op, err)
+			return nil, 0, fmt.Errorf("%s: failed to scan row: %w", op, err)
 		}
 		images = append(images, img)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("%s: rows error: %w", op, err)
+		return nil, 0, fmt.Errorf("%s: rows error: %w", op, err)
 	}
 
-	return images, nil
+	return images, totalCount, nil
 }
