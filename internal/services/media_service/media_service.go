@@ -318,19 +318,20 @@ func (s *MediaService) GetAllImages(ctx context.Context, limit int) ([]models.Me
 	return media, total, nil
 }
 
-// TODO: добавить кеш
-// func (s *MediaService) GetAllImages(ctx context.Context, limit int) ([]models.Media, error) {
-// 	const op = "media_service.GetAllImages"
+func (s *MediaService) GetImages(ctx context.Context) ([]models.Media, error) {
+	const op = "media_service.GetImages"
 
-// 	log := s.log.With(
-// 		"op", op,
-// 	)
+	log := s.log.With(
+		"op", op,
+	)
 
-// 	media, err := s.repo.GetAllImages(ctx, limit)
-// 	if err != nil {
-// 		log.Error("failed get media: %s %w", op, sl.Err(err))
-// 		return []models.Media{}, fmt.Errorf("failed get media list: %s %s", op, sl.Err(err))
-// 	}
+	media, err := s.repo.GetImages(ctx)
 
-// 	return media, nil
-// }
+	if err != nil {
+		log.Error("failed get media: %s %w", op, sl.Err(err))
+		return []models.Media{}, fmt.Errorf("failed get media list: %s %s", op, sl.Err(err))
+
+	}
+
+	return media, nil
+}

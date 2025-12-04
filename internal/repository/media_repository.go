@@ -481,3 +481,69 @@ func (r *MediaRepo) GetAllImages(ctx context.Context, limit int) ([]models.Media
 
 	return images, totalCount, nil
 }
+
+func (r *MediaRepo) GetImages(ctx context.Context) ([]models.Media, error) {
+	const op = "repository.media_repository.GetImages"
+
+	query, args, err := r.sb.
+		Select(
+			"id",
+			"uploader_id",
+			"created_at",
+			"original_filename",
+			"storage_path",
+			"file_size",
+			"width",
+			"height",
+			"is_public",
+			"metadata",
+		).
+		From("media").
+		OrderBy("created_at DESC").
+		ToSql()
+
+	if err != nil {
+		return nil, fmt.Errorf("%s: failed to build query: %w", op, err)
+	}
+
+	rows, err := r.db.Query(ctx, query, args...)
+
+	if err != nil {
+		return nil, fmt.Errorf("%s: failed to execute query: %w", op, err)
+	}
+
+	defer rows.Close()
+
+	var images []models.Media
+
+	for rows.Next() {
+		var img models.Media
+		err := rows.Scan(
+			&img.ID,
+			&img.UploaderID,
+			&img.CreatedAt,
+			&img.OriginalFilename,
+			&img.StoragePath,
+			&img.FileSize,
+			&img.Width,
+			&img.Height,
+			&img.IsPublic,
+			&img.Metadata,
+		)
+
+		if err != nil {
+
+			return nil, fmt.Errorf("%s: failed to scan row: %w", op, err)
+
+		}
+
+		images = append(images, img)
+
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: rows error: %w", op, err)
+	}
+
+	return images, nil
+}

@@ -280,6 +280,7 @@ func (s *Server) BuildRouters() {
 			mediaGroup.POST("/groups", s.routers.CreateMediaGroup)
 			mediaGroup.GET("/groups/group_id", s.routers.ListGroupMedia)
 			mediaGroup.GET("/images", s.routers.GetAllImages)
+			mediaGroup.GET("/image", s.routers.GetImages)
 		}
 
 		blogGroup := api.Group("/posts")

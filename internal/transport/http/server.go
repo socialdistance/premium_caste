@@ -36,6 +36,7 @@ type MediaService interface {
 	AttachMedia(ctx context.Context, ownerID uuid.UUID, description string) (uuid.UUID, error)
 	ListGroupMedia(ctx context.Context, groupID uuid.UUID) ([]models.Media, error)
 	GetAllImages(ctx context.Context, limit int) ([]models.Media, int, error)
+	GetImages(ctx context.Context) ([]models.Media, error)
 }
 
 type AuthService interface {
@@ -813,6 +814,34 @@ func (r *Routers) GetAllImages(c echo.Context) error {
 			"count": len(media),
 		},
 	}
+	return c.JSON(http.StatusOK, response)
+}
+
+func (r *Routers) GetImages(c echo.Context) error {
+	const op = "http.routers.GetImages"
+
+	log := r.log.With(
+
+		slog.String("op", op),
+	)
+
+	media, err := r.MediaService.GetImages(c.Request().Context())
+
+	if err != nil {
+		log.Error("invalid limit parameter", sl.Err(err))
+		return c.JSON(http.StatusBadRequest, response.ErrorResponse{
+			Error: "limit must be a valid integer",
+		})
+
+	}
+
+	response := map[string]interface{}{
+		"data": media,
+		"meta": map[string]interface{}{
+			"count": len(media),
+		},
+	}
+
 	return c.JSON(http.StatusOK, response)
 }
 
